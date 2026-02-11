@@ -223,6 +223,46 @@ wrapper.addEventListener("touchmove", (e) => {
 wrapper.addEventListener("touchend", () => {
   isDragging = false;
 });
+let initialDistance = null;
+let initialScale = 1;
+
+wrapper.addEventListener("touchstart", (e) => {
+
+  if (e.touches.length === 2) {
+    initialDistance = getDistance(e.touches[0], e.touches[1]);
+    initialScale = scale;
+  }
+
+  if (e.touches.length === 1) {
+    isDragging = true;
+    startX = e.touches[0].clientX - posX;
+    startY = e.touches[0].clientY - posY;
+  }
+});
+
+wrapper.addEventListener("touchmove", (e) => {
+
+  if (e.touches.length === 2) {
+    const currentDistance = getDistance(e.touches[0], e.touches[1]);
+    const scaleFactor = currentDistance / initialDistance;
+    scale = Math.min(Math.max(initialScale * scaleFactor, 0.5), 3);
+    updateTransform();
+    return;
+  }
+
+  if (!isDragging) return;
+
+  posX = e.touches[0].clientX - startX;
+  posY = e.touches[0].clientY - startY;
+  updateTransform();
+});
+
+function getDistance(t1, t2) {
+  return Math.sqrt(
+    Math.pow(t2.clientX - t1.clientX, 2) +
+    Math.pow(t2.clientY - t1.clientY, 2)
+  );
+}
 
 /* =========================
    🔄 Auto refresh
@@ -236,3 +276,4 @@ setInterval(loadPoints, 10000);
 
 loadPoints();
 updateTransform();
+
