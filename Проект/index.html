@@ -4,9 +4,10 @@
 <meta charset="UTF-8" />
 <meta name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+
 <title>Интерактивная карта</title>
 
-<!-- Telegram WebApp -->
+<!-- Telegram WebApp API -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
 <!-- Стили -->
@@ -16,7 +17,7 @@
 <body>
 
 <!-- =========================
-     🧭 Верхняя панель фильтров
+     🧭 ФИЛЬТРЫ
 ========================= -->
 <div id="topbar">
   <button class="filter-btn active" data-type="all">Все</button>
@@ -27,13 +28,13 @@
 </div>
 
 <!-- =========================
-     🗺 Карта
+     🗺 КАРТА
 ========================= -->
 <div id="map-wrapper">
   <div id="map-container">
 
     <!-- ДОЛЖЕН совпадать с admin-editor -->
-    <img src="assets/map.svg" id="map" alt="Карта" />
+    <img src="assets/map.svg" id="map" alt="Карта территории">
 
     <!-- Слой точек -->
     <div id="points-layer"></div>
@@ -42,7 +43,7 @@
 </div>
 
 <!-- =========================
-     🔍 Zoom-кнопки
+     🔍 ZOOM
 ========================= -->
 <div id="zoom-controls">
   <button class="zoom-btn">+</button>
@@ -50,7 +51,7 @@
 </div>
 
 <!-- =========================
-     📄 Модальное окно точки
+     📄 МОДАЛЬНОЕ ОКНО
 ========================= -->
 <div id="modal">
   <h2 id="modal-title"></h2>
@@ -62,8 +63,13 @@
 </div>
 
 <!-- =========================
-     🚀 Основная логика
+     🚀 SCRIPTS
 ========================= -->
+
+<!-- Telegram слой -->
+<script src="telegram.js"></script>
+
+<!-- Основная логика -->
 <script src="main.js"></script>
 
 </body>
