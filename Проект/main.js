@@ -1,21 +1,9 @@
 /* =========================
-   🚀 Telegram Init
-========================= */
-const tg = window.Telegram?.WebApp;
-if (tg) {
-  tg.ready();
-  tg.expand();
-
-  document.documentElement.style.setProperty('--bg', tg.themeParams.bg_color || '#ffffff');
-  document.documentElement.style.setProperty('--text', tg.themeParams.text_color || '#000000');
-  document.documentElement.style.setProperty('--accent', tg.themeParams.button_color || '#2AABEE');
-}
-
-/* =========================
    ⚙ CONFIG
 ========================= */
 
-const TEAM_ID = localStorage.getItem("team_id") || "team_1";
+const TEAM_ID = window.TelegramApp?.teamId || localStorage.getItem("team_id") || "team_1";
+
 let pointsData = [];
 let currentFilter = "all";
 let activePoint = null;
@@ -118,8 +106,10 @@ const completeBtn = document.getElementById("complete-btn");
 
 function openModal(point) {
   activePoint = point;
-  modalTitle.innerText = point.title;
-  modalDesc.innerText = point.desc;
+
+  modalTitle.innerText = point.title || "";
+  modalDesc.innerText = point.desc || "";
+
   modal.style.display = "block";
 
   if (teamProgress.includes(point.id)) {
@@ -130,10 +120,23 @@ function openModal(point) {
 }
 
 completeBtn.addEventListener("click", () => {
+
+  if (!activePoint) return;
+
   if (!teamProgress.includes(activePoint.id)) {
     teamProgress.push(activePoint.id);
     saveProgress();
   }
+
+  // Отправка события в Telegram-бот
+  if (window.TelegramApp) {
+    TelegramApp.sendData({
+      type: "point_completed",
+      team: TEAM_ID,
+      pointId: activePoint.id
+    });
+  }
+
   modal.style.display = "none";
   renderPoints();
 });
@@ -222,7 +225,7 @@ wrapper.addEventListener("touchend", () => {
 });
 
 /* =========================
-   🔄 Auto refresh (каждые 10 сек)
+   🔄 Auto refresh
 ========================= */
 
 setInterval(loadPoints, 10000);
