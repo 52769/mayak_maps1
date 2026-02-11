@@ -1,8 +1,21 @@
 /* =========================
+   🚀 Telegram Init
+========================= */
+
+const tg = window.Telegram?.WebApp;
+if (tg) {
+  tg.ready();
+  tg.expand();
+}
+
+/* =========================
    ⚙ CONFIG
 ========================= */
 
-const TEAM_ID = window.TelegramApp?.teamId || localStorage.getItem("team_id") || "team_1";
+const TEAM_ID =
+  window.TelegramApp?.teamId ||
+  localStorage.getItem("team_id") ||
+  "team_1";
 
 let pointsData = [];
 let currentFilter = "all";
@@ -112,11 +125,8 @@ function openModal(point) {
 
   modal.style.display = "block";
 
-  if (teamProgress.includes(point.id)) {
-    completeBtn.style.display = "none";
-  } else {
-    completeBtn.style.display = "block";
-  }
+  const alreadyCompleted = teamProgress.includes(point.id);
+  completeBtn.style.display = alreadyCompleted ? "none" : "block";
 }
 
 completeBtn.addEventListener("click", () => {
@@ -126,15 +136,6 @@ completeBtn.addEventListener("click", () => {
   if (!teamProgress.includes(activePoint.id)) {
     teamProgress.push(activePoint.id);
     saveProgress();
-  }
-
-  // Отправка события в Telegram-бот
-  if (window.TelegramApp) {
-    TelegramApp.sendData({
-      type: "point_completed",
-      team: TEAM_ID,
-      pointId: activePoint.id
-    });
   }
 
   modal.style.display = "none";
@@ -148,7 +149,7 @@ modal.addEventListener("click", (e) => {
 });
 
 /* =========================
-   🔍 Zoom + Drag
+   🗺 Zoom + Drag (Google Maps Style)
 ========================= */
 
 let scale = 1;
@@ -165,27 +166,53 @@ function updateTransform() {
     `translate(${posX}px, ${posY}px) scale(${scale})`;
 }
 
-function zoom(factor) {
+/* ====== Zoom в точку ====== */
+
+function zoomAtPoint(clientX, clientY, factor) {
+
+  const rect = wrapper.getBoundingClientRect();
+
+  const x = clientX - rect.left;
+  const y = clientY - rect.top;
+
+  const prevScale = scale;
   scale *= factor;
   scale = Math.min(Math.max(scale, 0.5), 3);
+
+  posX = x - ((x - posX) * (scale / prevScale));
+  posY = y - ((y - posY) * (scale / prevScale));
+
   updateTransform();
 }
 
-/* Zoom buttons */
+/* ====== Кнопки ====== */
+
 document.querySelectorAll(".zoom-btn").forEach(btn => {
   btn.addEventListener("click", () => {
+    const rect = wrapper.getBoundingClientRect();
     const factor = btn.innerText === "+" ? 1.2 : 0.8;
-    zoom(factor);
+
+    zoomAtPoint(
+      rect.left + rect.width / 2,
+      rect.top + rect.height / 2,
+      factor
+    );
   });
 });
 
-/* Mouse wheel zoom */
+/* ====== Колесо мыши ====== */
+
 wrapper.addEventListener("wheel", (e) => {
   e.preventDefault();
-  zoom(e.deltaY < 0 ? 1.1 : 0.9);
+  zoomAtPoint(
+    e.clientX,
+    e.clientY,
+    e.deltaY < 0 ? 1.1 : 0.9
+  );
 });
 
-/* Drag mouse */
+/* ====== Drag мышью ====== */
+
 wrapper.addEventListener("mousedown", (e) => {
   isDragging = true;
   startX = e.clientX - posX;
@@ -204,25 +231,8 @@ window.addEventListener("mousemove", (e) => {
   updateTransform();
 });
 
-/* Touch drag */
-wrapper.addEventListener("touchstart", (e) => {
-  if (e.touches.length === 1) {
-    isDragging = true;
-    startX = e.touches[0].clientX - posX;
-    startY = e.touches[0].clientY - posY;
-  }
-});
+/* ====== Touch (1 палец — drag, 2 пальца — zoom) ====== */
 
-wrapper.addEventListener("touchmove", (e) => {
-  if (!isDragging) return;
-  posX = e.touches[0].clientX - startX;
-  posY = e.touches[0].clientY - startY;
-  updateTransform();
-});
-
-wrapper.addEventListener("touchend", () => {
-  isDragging = false;
-});
 let initialDistance = null;
 let initialScale = 1;
 
@@ -243,10 +253,16 @@ wrapper.addEventListener("touchstart", (e) => {
 wrapper.addEventListener("touchmove", (e) => {
 
   if (e.touches.length === 2) {
+
     const currentDistance = getDistance(e.touches[0], e.touches[1]);
     const scaleFactor = currentDistance / initialDistance;
-    scale = Math.min(Math.max(initialScale * scaleFactor, 0.5), 3);
-    updateTransform();
+
+    const newScale = Math.min(Math.max(initialScale * scaleFactor, 0.5), 3);
+
+    const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+
+    zoomAtPoint(centerX, centerY, newScale / scale);
     return;
   }
 
@@ -256,6 +272,12 @@ wrapper.addEventListener("touchmove", (e) => {
   posY = e.touches[0].clientY - startY;
   updateTransform();
 });
+
+wrapper.addEventListener("touchend", () => {
+  isDragging = false;
+});
+
+/* ====== Distance helper ====== */
 
 function getDistance(t1, t2) {
   return Math.sqrt(
@@ -276,4 +298,3 @@ setInterval(loadPoints, 10000);
 
 loadPoints();
 updateTransform();
-
