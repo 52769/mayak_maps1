@@ -8,7 +8,7 @@
 <style>
 body{
   margin:0;
-  font-family:Arial, sans-serif;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
   display:flex;
   height:100vh;
   overflow:hidden;
@@ -16,7 +16,7 @@ body{
 
 /* Sidebar */
 #sidebar{
-  width:340px;
+  width:360px;
   background:#f4f6f9;
   padding:15px;
   box-sizing:border-box;
@@ -28,10 +28,11 @@ h3{margin:15px 0 8px}
 
 input, select, textarea{
   width:100%;
-  padding:6px;
+  padding:8px;
   margin-bottom:8px;
   box-sizing:border-box;
-  font-family:inherit;
+  border-radius:8px;
+  border:1px solid #ccc;
 }
 
 textarea{
@@ -44,10 +45,11 @@ button{
   padding:8px;
   margin-bottom:8px;
   border:none;
-  border-radius:6px;
+  border-radius:8px;
   background:#2AABEE;
   color:white;
   cursor:pointer;
+  font-size:14px;
 }
 
 button.red{background:#e74c3c}
@@ -56,7 +58,7 @@ button.gray{background:#888}
 .point-item{
   padding:6px;
   background:white;
-  margin-bottom:5px;
+  margin-bottom:6px;
   border-radius:6px;
   cursor:pointer;
 }
@@ -102,13 +104,14 @@ button.gray{background:#888}
 <body>
 
 <div id="sidebar">
+
   <h3>➕ Добавление</h3>
   <button id="addModeBtn">Режим добавления</button>
 
   <h3>✏ Редактирование</h3>
-  <input id="titleInput" placeholder="Название точки">
 
-  <textarea id="descInput" placeholder="Комментарий к точке"></textarea>
+  <input id="titleInput" placeholder="Название точки">
+  <textarea id="descInput" placeholder="Описание"></textarea>
 
   <select id="typeInput">
     <option value="quest">Квест</option>
@@ -117,7 +120,16 @@ button.gray{background:#888}
     <option value="finish">Финиш</option>
   </select>
 
+  <label>⏳ Время открытия</label>
   <input id="unlockInput" type="datetime-local">
+
+  <label>
+    <input type="checkbox" id="lockedInput">
+    Принудительно закрыта
+  </label>
+
+  <h4>👥 Видимость для команд</h4>
+  <div id="teamsList"></div>
 
   <button id="saveBtn">Сохранить изменения</button>
   <button id="deleteBtn" class="red">Удалить точку</button>
@@ -127,55 +139,69 @@ button.gray{background:#888}
 
   <h3>📍 Список точек</h3>
   <div id="pointsList"></div>
+
 </div>
 
 <div id="map-wrapper">
   <div id="map-container">
-    <!-- ДОЛЖЕН совпадать с index -->
     <img src="assets/map.svg" id="map">
     <div id="points-layer"></div>
   </div>
 </div>
 
 <script>
-let points = [];
-let selectedId = null;
-let addMode = false;
+let points=[];
+let selectedId=null;
+let addMode=false;
+let teams=[];
 
-const layer = document.getElementById("points-layer");
-const list = document.getElementById("pointsList");
-const container = document.getElementById("map-container");
-const wrapper = document.getElementById("map-wrapper");
+const API="https://your-backend-url.com/api";
 
-const titleInput = document.getElementById("titleInput");
-const descInput = document.getElementById("descInput");
-const typeInput = document.getElementById("typeInput");
-const unlockInput = document.getElementById("unlockInput");
+const layer=document.getElementById("points-layer");
+const list=document.getElementById("pointsList");
+const container=document.getElementById("map-container");
+const wrapper=document.getElementById("map-wrapper");
+const teamsList=document.getElementById("teamsList");
 
-/* =============================
-   📦 Загрузка JSON
-============================= */
-async function loadPoints(){
-  try{
-    const res = await fetch("data/points.json?t="+Date.now());
-    points = await res.json();
-    render();
-  }catch(e){
-    console.warn("points.json не найден — создаём пустой массив");
-    points = [];
-    render();
-  }
+const titleInput=document.getElementById("titleInput");
+const descInput=document.getElementById("descInput");
+const typeInput=document.getElementById("typeInput");
+const unlockInput=document.getElementById("unlockInput");
+const lockedInput=document.getElementById("lockedInput");
+
+/* ===========================
+   📦 Загрузка
+=========================== */
+async function loadData(){
+  points=await fetch(API+"/points").then(r=>r.json());
+  teams=await fetch(API+"/teams").then(r=>r.json());
+  render();
+  renderTeamsCheckboxes();
 }
 
-/* =============================
+/* ===========================
+   👥 Команды чекбоксы
+=========================== */
+function renderTeamsCheckboxes(){
+  teamsList.innerHTML="";
+  teams.forEach(t=>{
+    teamsList.innerHTML+=`
+      <label>
+        <input type="checkbox" value="${t.id}" class="teamCheck">
+        ${t.name}
+      </label><br>
+    `;
+  });
+}
+
+/* ===========================
    🗺 Render
-============================= */
+=========================== */
 function render(){
   layer.innerHTML="";
   list.innerHTML="";
 
   points.forEach(p=>{
-
     const img=document.createElement("img");
     img.src="assets/icons/"+p.type+".png";
     img.className="point";
@@ -190,11 +216,6 @@ function render(){
       selectPoint(p.id);
     };
 
-    img.onmousedown=e=>{
-      e.stopPropagation();
-      startDrag(e,p);
-    };
-
     layer.appendChild(img);
 
     const item=document.createElement("div");
@@ -202,16 +223,16 @@ function render(){
     if(p.id===selectedId)
       item.classList.add("active");
 
-    item.innerText=p.title || "Без названия";
+    item.innerText=p.title||"Без названия";
     item.onclick=()=>selectPoint(p.id);
 
     list.appendChild(item);
   });
 }
 
-/* =============================
+/* ===========================
    📍 Выбор точки
-============================= */
+=========================== */
 function selectPoint(id){
   selectedId=id;
   const p=points.find(pt=>pt.id===id);
@@ -221,13 +242,18 @@ function selectPoint(id){
   descInput.value=p.desc||"";
   typeInput.value=p.type;
   unlockInput.value=p.unlock||"";
+  lockedInput.checked=p.locked||false;
+
+  document.querySelectorAll(".teamCheck").forEach(ch=>{
+    ch.checked = p.visible_for?.includes(Number(ch.value));
+  });
 
   render();
 }
 
-/* =============================
+/* ===========================
    ➕ Добавление
-============================= */
+=========================== */
 addModeBtn.onclick=()=>{
   addMode=!addMode;
   wrapper.style.cursor=addMode?"crosshair":"grab";
@@ -249,36 +275,17 @@ wrapper.onclick=e=>{
     type:"quest",
     x,
     y,
-    unlock:""
+    unlock:"",
+    locked:false,
+    visible_for:[]
   });
 
   selectPoint(id);
 };
 
-/* =============================
-   ✋ Drag
-============================= */
-function startDrag(e,point){
-
-  function move(ev){
-    const rect=container.getBoundingClientRect();
-    point.x=((ev.clientX-rect.left)/rect.width)*100;
-    point.y=((ev.clientY-rect.top)/rect.height)*100;
-    render();
-  }
-
-  function stop(){
-    window.removeEventListener("mousemove",move);
-    window.removeEventListener("mouseup",stop);
-  }
-
-  window.addEventListener("mousemove",move);
-  window.addEventListener("mouseup",stop);
-}
-
-/* =============================
+/* ===========================
    💾 Сохранение
-============================= */
+=========================== */
 saveBtn.onclick=()=>{
   const p=points.find(pt=>pt.id===selectedId);
   if(!p)return;
@@ -287,13 +294,22 @@ saveBtn.onclick=()=>{
   p.desc=descInput.value;
   p.type=typeInput.value;
   p.unlock=unlockInput.value;
+  p.locked=lockedInput.checked;
+
+  const selectedTeams=[];
+  document.querySelectorAll(".teamCheck").forEach(ch=>{
+    if(ch.checked)
+      selectedTeams.push(Number(ch.value));
+  });
+
+  p.visible_for=selectedTeams;
 
   render();
 };
 
-/* =============================
+/* ===========================
    🗑 Удаление
-============================= */
+=========================== */
 deleteBtn.onclick=()=>{
   if(!selectedId)return;
   points=points.filter(p=>p.id!==selectedId);
@@ -301,64 +317,26 @@ deleteBtn.onclick=()=>{
   render();
 };
 
-/* =============================
+/* ===========================
    📥 Экспорт JSON
-============================= */
-saveJsonBtn.onclick = () => {
-
-  const jsonString = JSON.stringify(points, null, 2);
-
-  // Добавляем BOM для корректной UTF-8 кодировки
-  const blob = new Blob(
-    ["\uFEFF" + jsonString],
-    { type: "application/json;charset=utf-8;" }
+=========================== */
+saveJsonBtn.onclick=()=>{
+  const jsonString=JSON.stringify(points,null,2);
+  const blob=new Blob(
+    ["\uFEFF"+jsonString],
+    {type:"application/json;charset=utf-8;"}
   );
 
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = "points.json";
+  const link=document.createElement("a");
+  link.href=URL.createObjectURL(blob);
+  link.download="points.json";
   link.click();
 };
 
-/* =============================
-   🔍 Zoom + Pan
-============================= */
-let scale=1,posX=0,posY=0;
-let dragging=false,startX,startY;
-
-function updateTransform(){
-  container.style.transform=
-    `translate(${posX}px,${posY}px) scale(${scale})`;
-}
-
-wrapper.onwheel=e=>{
-  e.preventDefault();
-  scale+=e.deltaY<0?0.1:-0.1;
-  scale=Math.min(Math.max(scale,0.5),3);
-  updateTransform();
-};
-
-wrapper.onmousedown=e=>{
-  if(addMode)return;
-  dragging=true;
-  startX=e.clientX-posX;
-  startY=e.clientY-posY;
-};
-
-window.onmousemove=e=>{
-  if(!dragging)return;
-  posX=e.clientX-startX;
-  posY=e.clientY-startY;
-  updateTransform();
-};
-
-window.onmouseup=()=>dragging=false;
-
-/* =============================
+/* ===========================
    🚀 INIT
-============================= */
-loadPoints();
-updateTransform();
+=========================== */
+loadData();
 </script>
 
 </body>
