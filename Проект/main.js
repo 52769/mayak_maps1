@@ -14,22 +14,60 @@ if (tg) {
 
 const API = "https://your-backend-url.com/api";
 
-const TEAM_ID = localStorage.getItem("team_id") || "team_1";
-const ROLE = localStorage.getItem("role") || "member";
+let TEAM_NUMBER = null;
+let ROLE = "member";
 
 let pointsData = [];
+let completedPoints = [];
 let currentFilter = "all";
 let activePoint = null;
-let completedPoints = [];
 
 /* =========================
-   📦 Load Points from Backend
+   👤 Получение данных пользователя
+========================= */
+
+async function loadUser() {
+
+  if (!tg || !tg.initDataUnsafe?.user) {
+    console.warn("Dev mode — fallback user");
+    TEAM_NUMBER = localStorage.getItem("team_id") || "1";
+    ROLE = localStorage.getItem("role") || "member";
+    return;
+  }
+
+  const telegram_id = tg.initDataUnsafe.user.id;
+
+  const response = await fetch(API + "/me", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ telegram_id })
+  });
+
+  const data = await response.json();
+
+  TEAM_NUMBER = data.team_number;
+  ROLE = data.role;
+
+  localStorage.setItem("team_id", TEAM_NUMBER);
+  localStorage.setItem("role", ROLE);
+
+  updateTeamInfo();
+}
+
+/* =========================
+   📦 Загрузка точек
 ========================= */
 
 async function loadPoints() {
+
+  if (!TEAM_NUMBER) return;
+
   try {
+
     const response = await fetch(
-      API + "/points?team_id=" + TEAM_ID
+      API + "/points?team_number=" + TEAM_NUMBER
     );
 
     const data = await response.json();
@@ -56,6 +94,7 @@ document.querySelectorAll(".filter-btn").forEach(btn => {
 
     btn.classList.add("active");
     currentFilter = btn.dataset.type;
+
     renderPoints();
   });
 });
@@ -72,25 +111,24 @@ function renderPoints() {
 
   pointsData.forEach(point => {
 
-    /* 🔎 Фильтр типа */
+    /* Фильтр по типу */
     if (currentFilter !== "all" && point.type !== currentFilter)
       return;
 
-    /* 👥 Видимость для команды */
+    /* Видимость для команд */
     if (
       point.visible_for &&
       point.visible_for.length > 0 &&
-      !point.visible_for.includes(point.team_numeric_id)
+      !point.visible_for.includes(String(TEAM_NUMBER))
     ) return;
 
-    /* ⏳ Проверка времени */
+    /* Проверка времени открытия */
     const now = new Date();
     const unlockTime = point.unlock ? new Date(point.unlock) : null;
 
     const lockedByTime = unlockTime && now < unlockTime;
     const locked = point.locked || lockedByTime;
 
-    /* 📍 Создание точки */
     const el = document.createElement("img");
     el.src = "assets/icons/" + point.type + ".png";
     el.className = "point";
@@ -98,11 +136,11 @@ function renderPoints() {
     el.style.left = point.x + "%";
     el.style.top = point.y + "%";
 
-    /* ✅ Пройдено */
+    /* Пройденные */
     if (completedPoints.includes(point.id))
       el.classList.add("completed");
 
-    /* 🔒 Закрыто */
+    /* Закрытые */
     if (locked)
       el.classList.add("locked");
 
@@ -158,38 +196,21 @@ function openModal(point) {
    ✅ Complete Point
 ========================= */
 
-completeBtn.addEventListener("click", async () => {
+completeBtn.addEventListener("click", () => {
 
   if (!activePoint) return;
 
-  try {
+  if (!tg) return;
 
-    /* Отправляем в Telegram-бот */
-    if (tg) {
-      tg.sendData(JSON.stringify({
-        type: "point_completed",
-        pointId: activePoint.id
-      }));
-    }
+  tg.sendData(JSON.stringify({
+    type: "point_completed",
+    pointId: activePoint.id
+  }));
 
-    /* Также отправляем в backend */
-    await fetch(API + "/points/complete", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        team_id: TEAM_ID,
-        point_id: activePoint.id
-      })
-    });
+  modal.style.display = "none";
 
-    modal.style.display = "none";
-    loadPoints();
-
-  } catch (err) {
-    console.error("Ошибка отметки точки:", err);
-  }
+  /* Перезагружаем точки через 1 сек */
+  setTimeout(loadPoints, 1000);
 });
 
 /* =========================
@@ -216,21 +237,20 @@ function zoom(factor) {
   updateTransform();
 }
 
-/* Zoom buttons */
+/* Zoom кнопки */
 document.querySelectorAll(".zoom-btn").forEach(btn => {
   btn.addEventListener("click", () => {
-    const factor = btn.innerText === "+" ? 1.2 : 0.8;
-    zoom(factor);
+    zoom(btn.innerText === "+" ? 1.2 : 0.8);
   });
 });
 
-/* Mouse wheel zoom */
+/* Колёсико */
 wrapper.addEventListener("wheel", (e) => {
   e.preventDefault();
   zoom(e.deltaY < 0 ? 1.1 : 0.9);
 });
 
-/* Drag mouse */
+/* Drag мышью */
 wrapper.addEventListener("mousedown", (e) => {
   isDragging = true;
   startX = e.clientX - posX;
@@ -249,7 +269,7 @@ window.addEventListener("mousemove", (e) => {
   updateTransform();
 });
 
-/* Touch drag */
+/* Touch */
 wrapper.addEventListener("touchstart", (e) => {
   if (e.touches.length === 1) {
     isDragging = true;
@@ -260,6 +280,7 @@ wrapper.addEventListener("touchstart", (e) => {
 
 wrapper.addEventListener("touchmove", (e) => {
   if (!isDragging) return;
+
   posX = e.touches[0].clientX - startX;
   posY = e.touches[0].clientY - startY;
   updateTransform();
@@ -270,14 +291,26 @@ wrapper.addEventListener("touchend", () => {
 });
 
 /* =========================
-   🔄 Auto refresh
+   👥 Обновление верхней панели
 ========================= */
 
-setInterval(loadPoints, 10000);
+function updateTeamInfo() {
+  const teamInfo = document.getElementById("team-info");
+
+  if (!teamInfo) return;
+
+  teamInfo.innerHTML = `
+    👥 Команда: <b>${TEAM_NUMBER}</b><br>
+    Роль: ${ROLE === "curator" ? "Куратор" : "Участник"}
+  `;
+}
 
 /* =========================
    🚀 INIT
 ========================= */
 
-loadPoints();
-updateTransform();
+(async () => {
+  await loadUser();
+  await loadPoints();
+  updateTransform();
+})();
