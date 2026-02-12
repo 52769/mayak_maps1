@@ -7,39 +7,60 @@ let completedPoints = [];
 let currentFilter = "all";
 
 document.addEventListener("DOMContentLoaded", () => {
-  safeInit();
+  initApp();
 });
 
-async function safeInit() {
-  try {
-    await loadUser();
-  } catch (e) {
-    console.error("loadUser failed", e);
-  }
-
-  try {
-    await loadPoints();
-  } catch (e) {
-    console.error("loadPoints failed", e);
-  }
-
+async function initApp() {
+  await waitForTelegram();
+  await loadUser();
+  await loadPoints();
   initFilters();
   initMapControls();
 }
 
 /* ========================= */
 
+function waitForTelegram() {
+  return new Promise(resolve => {
+    const check = () => {
+      if (window.Telegram && window.Telegram.WebApp) {
+        resolve();
+      } else {
+        setTimeout(check, 100);
+      }
+    };
+    check();
+  });
+}
+
+/* ========================= */
+
 async function loadUser() {
+
   const tg = window.Telegram?.WebApp;
 
-  if (!tg?.initDataUnsafe?.user) {
-    console.warn("Telegram user not detected");
+  if (!tg) {
+    log("Telegram WebApp not found");
+    return;
+  }
+
+  tg.ready();
+
+  let attempts = 0;
+  while (!tg.initDataUnsafe?.user && attempts < 15) {
+    await new Promise(r => setTimeout(r, 200));
+    attempts++;
+  }
+
+  if (!tg.initDataUnsafe?.user) {
+    log("Telegram user not detected");
     return;
   }
 
   const telegram_id = tg.initDataUnsafe.user.id;
 
   try {
+
     const response = await fetch(API + "/me", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -47,7 +68,7 @@ async function loadUser() {
     });
 
     if (!response.ok) {
-      console.warn("User not found in DB");
+      log("User not registered");
       return;
     }
 
@@ -59,7 +80,7 @@ async function loadUser() {
     updateTeamInfo();
 
   } catch (err) {
-    console.error("API error:", err);
+    log("User API error");
   }
 }
 
@@ -75,7 +96,10 @@ async function loadPoints() {
       API + "/points?team_number=" + TEAM_NUMBER
     );
 
-    if (!response.ok) return;
+    if (!response.ok) {
+      log("Points API error");
+      return;
+    }
 
     const data = await response.json();
 
@@ -85,7 +109,7 @@ async function loadPoints() {
     renderPoints();
 
   } catch (err) {
-    console.error("Points error:", err);
+    log("Points fetch failed");
   }
 }
 
@@ -139,8 +163,7 @@ function updateTeamInfo() {
   if (!teamInfo) return;
 
   teamInfo.innerHTML =
-    `Команда: ${TEAM_NUMBER}<br>
-     Роль: ${ROLE}`;
+    `Команда: ${TEAM_NUMBER}<br>Роль: ${ROLE}`;
 }
 
 /* ========================= */
@@ -175,5 +198,12 @@ function initMapControls() {
       update();
     }
   });
+}
 
+/* ========================= */
+
+function log(msg) {
+  const debug = document.getElementById("debug");
+  if (debug)
+    debug.innerHTML += `<div>${msg}</div>`;
 }
