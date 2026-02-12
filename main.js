@@ -178,10 +178,26 @@ function openModal(point) {
     modal.style.display = "none";
   };
 
+  // если уже выполнена
+  if (completedPoints.includes(point.id)) {
+    completeBtn.innerText = "Точка уже пройдена";
+    completeBtn.disabled = true;
+    completeBtn.style.opacity = "0.6";
+    return;
+  }
+
+  completeBtn.innerText = "Отметить как пройдено";
+  completeBtn.disabled = false;
+  completeBtn.style.opacity = "1";
+
   completeBtn.onclick = async () => {
 
+    completeBtn.innerText = "Отмечаем...";
+    completeBtn.disabled = true;
+
     try {
-      await fetch(API + "/complete", {
+
+      const response = await fetch(API + "/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -190,14 +206,26 @@ function openModal(point) {
         })
       });
 
-      modal.style.display = "none";
-      loadPoints();
+      if (!response.ok) {
+        completeBtn.innerText = "Ошибка";
+        completeBtn.disabled = false;
+        return;
+      }
+
+      completeBtn.innerText = "Готово ✅";
+
+      setTimeout(() => {
+        modal.style.display = "none";
+        loadPoints();
+      }, 800);
 
     } catch (err) {
-      log("Complete error");
+      completeBtn.innerText = "Ошибка сети";
+      completeBtn.disabled = false;
     }
   };
 }
+
 
 /* =========================
    🎛 Фильтры
@@ -272,3 +300,4 @@ function log(msg) {
   if (debug)
     debug.innerHTML += `<div>${msg}</div>`;
 }
+
