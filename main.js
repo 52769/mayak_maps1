@@ -191,12 +191,9 @@ function openModal(point) {
   completeBtn.style.opacity = "1";
 
   completeBtn.onclick = async () => {
-
-    completeBtn.innerText = "Отмечаем...";
-    completeBtn.disabled = true;
-
+  
     try {
-
+  
       const response = await fetch(API + "/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -205,12 +202,14 @@ function openModal(point) {
           point_id: point.id
         })
       });
-
-      if (!response.ok) {
-        completeBtn.innerText = "Ошибка";
-        completeBtn.disabled = false;
-        return;
-      }
+  
+      const text = await response.text();
+      alert("Ответ сервера: " + text);
+  
+    } catch (err) {
+      alert("Сетевая ошибка");
+    }
+  };
 
       completeBtn.innerText = "Готово ✅";
 
@@ -300,4 +299,5 @@ function log(msg) {
   if (debug)
     debug.innerHTML += `<div>${msg}</div>`;
 }
+
 
