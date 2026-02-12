@@ -10,6 +10,8 @@ document.addEventListener("DOMContentLoaded", () => {
   initApp();
 });
 
+/* ========================= */
+
 async function initApp() {
   await waitForTelegram();
   await loadUser();
@@ -80,7 +82,7 @@ async function loadUser() {
     updateTeamInfo();
 
   } catch (err) {
-    log("User API error");
+    log("User API error: " + err.message);
   }
 }
 
@@ -88,16 +90,20 @@ async function loadUser() {
 
 async function loadPoints() {
 
-  if (!TEAM_NUMBER) return;
+  if (!TEAM_NUMBER) {
+    log("TEAM_NUMBER not set");
+    return;
+  }
 
   try {
 
     const response = await fetch(
-      API + "/points?team_number=" + TEAM_NUMBER
+      API + "/points?team_number=" + encodeURIComponent(TEAM_NUMBER)
     );
 
     if (!response.ok) {
-      log("Points API error");
+      const text = await response.text();
+      log("Points API error: " + text);
       return;
     }
 
@@ -109,7 +115,7 @@ async function loadPoints() {
     renderPoints();
 
   } catch (err) {
-    log("Points fetch failed");
+    log("Points fetch failed: " + err.message);
   }
 }
 
@@ -135,6 +141,13 @@ function renderPoints() {
 
     const el = document.createElement("div");
     el.className = "point";
+
+    if (completedPoints.includes(point.id))
+      el.classList.add("completed");
+
+    if (point.locked)
+      el.classList.add("locked");
+
     el.style.left = point.x + "%";
     el.style.top = point.y + "%";
 
@@ -207,4 +220,3 @@ function log(msg) {
   if (debug)
     debug.innerHTML += `<div>${msg}</div>`;
 }
-
