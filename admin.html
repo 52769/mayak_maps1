@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Админ-панель</title>
+
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+<style>
+body{
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  background:#f4f6f9;
+}
+
+header{
+  padding:16px;
+  background:#2AABEE;
+  color:white;
+  font-size:20px;
+  font-weight:600;
+}
+
+.section{
+  padding:16px;
+}
+
+.card{
+  background:white;
+  padding:14px;
+  border-radius:14px;
+  margin-bottom:12px;
+  box-shadow:0 3px 10px rgba(0,0,0,0.05);
+}
+
+button{
+  padding:8px 12px;
+  border:none;
+  border-radius:8px;
+  cursor:pointer;
+  background:#2AABEE;
+  color:white;
+  font-size:14px;
+  margin-top:6px;
+}
+
+button.red{ background:#e74c3c; }
+
+.progress{
+  height:8px;
+  background:#eee;
+  border-radius:4px;
+  margin-top:6px;
+}
+
+.progress-bar{
+  height:8px;
+  background:#2AABEE;
+  border-radius:4px;
+}
+</style>
+</head>
+<body>
+
+<header>⚙ Админ-панель</header>
+
+<div class="section">
+
+  <h3>🏆 Рейтинг</h3>
+  <div id="rating"></div>
+
+  <h3>👥 Команды</h3>
+  <div id="teams"></div>
+
+  <h3>📍 Точки</h3>
+  <div id="points"></div>
+
+</div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+if (tg) {
+  tg.ready();
+  tg.expand();
+}
+
+const API = "https://your-backend-url.com/api";
+
+let ratingData = [];
+let pointsData = [];
+
+/* =========================
+   📦 Загрузка данных
+========================= */
+
+async function loadData(){
+
+  const ratingResponse = await fetch(API + "/rating");
+  ratingData = await ratingResponse.json();
+
+  const pointsResponse = await fetch("points.json");
+  pointsData = await pointsResponse.json();
+
+  renderRating();
+  renderTeams();
+  renderPoints();
+}
+
+/* =========================
+   🏆 Рейтинг
+========================= */
+
+function renderRating(){
+  const container=document.getElementById("rating");
+  container.innerHTML="";
+
+  if(!ratingData.length){
+    container.innerHTML="<div class='card'>Нет данных</div>";
+    return;
+  }
+
+  ratingData.forEach((item,index)=>{
+    container.innerHTML+=`
+      <div class="card">
+        ${index+1}. Команда <b>${item.name || item[0]}</b>
+        — ${item.score || item[1]} очков
+      </div>
+    `;
+  });
+}
+
+/* =========================
+   👥 Команды
+========================= */
+
+function renderTeams(){
+
+  const container=document.getElementById("teams");
+  container.innerHTML="";
+
+  if(!ratingData.length){
+    container.innerHTML="<div class='card'>Пока нет прогресса</div>";
+    return;
+  }
+
+  ratingData.forEach(item=>{
+
+    const team = item.name || item[0];
+    const score = item.score || item[1];
+
+    container.innerHTML+=`
+      <div class="card">
+        <b>Команда ${team}</b><br>
+        Пройдено точек: ${score}
+        <br>
+        <button class="red" onclick="resetTeam('${team}')">
+          Сбросить прогресс
+        </button>
+      </div>
+    `;
+  });
+}
+
+async function resetTeam(team){
+  if(!confirm("Сбросить прогресс команды "+team+"?")) return;
+
+  await fetch(API + "/reset-team",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({team_number:team})
+  });
+
+  loadData();
+}
+
+/* =========================
+   📍 Точки
+========================= */
+
+function renderPoints(){
+  const container=document.getElementById("points");
+  container.innerHTML="";
+
+  pointsData.forEach(p=>{
+    container.innerHTML+=`
+      <div class="card">
+        <b>${p.title}</b><br>
+        Тип: ${p.type}<br>
+        Locked: ${p.locked ? "Да" : "Нет"}
+      </div>
+    `;
+  });
+}
+
+/* =========================
+   🚀 INIT
+========================= */
+
+loadData();
+</script>
+
+</body>
+</html>

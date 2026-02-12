@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Редактор карты</title>
+
+<style>
+body{
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  display:flex;
+  height:100vh;
+  overflow:hidden;
+}
+
+/* Sidebar */
+#sidebar{
+  width:360px;
+  background:#f4f6f9;
+  padding:15px;
+  box-sizing:border-box;
+  overflow-y:auto;
+  border-right:1px solid #ddd;
+}
+
+h3{margin:15px 0 8px}
+
+input, select, textarea{
+  width:100%;
+  padding:8px;
+  margin-bottom:8px;
+  box-sizing:border-box;
+  border-radius:8px;
+  border:1px solid #ccc;
+}
+
+textarea{
+  resize:vertical;
+  min-height:80px;
+}
+
+button{
+  width:100%;
+  padding:8px;
+  margin-bottom:8px;
+  border:none;
+  border-radius:8px;
+  background:#2AABEE;
+  color:white;
+  cursor:pointer;
+  font-size:14px;
+}
+
+button.red{background:#e74c3c}
+button.gray{background:#888}
+
+.point-item{
+  padding:6px;
+  background:white;
+  margin-bottom:6px;
+  border-radius:6px;
+  cursor:pointer;
+}
+
+.point-item.active{
+  background:#d0ebff;
+}
+
+/* Map */
+#map-wrapper{
+  flex:1;
+  position:relative;
+  overflow:hidden;
+  background:#ddd;
+  cursor:grab;
+}
+
+#map-container{
+  position:absolute;
+  transform-origin:0 0;
+}
+
+#map{
+  display:block;
+  user-select:none;
+  pointer-events:none;
+}
+
+.point{
+  position:absolute;
+  width:36px;
+  height:36px;
+  transform:translate(-50%,-50%);
+  cursor:pointer;
+}
+
+.point.selected{
+  outline:3px solid yellow;
+  border-radius:50%;
+}
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+
+  <h3>➕ Добавление</h3>
+  <button id="addModeBtn">Режим добавления</button>
+
+  <h3>✏ Редактирование</h3>
+
+  <input id="titleInput" placeholder="Название точки">
+  <textarea id="descInput" placeholder="Описание"></textarea>
+
+  <select id="typeInput">
+    <option value="quest">Квест</option>
+    <option value="info">Инфо</option>
+    <option value="live">Проживание</option>
+    <option value="finish">Финиш</option>
+  </select>
+
+  <label>⏳ Время открытия</label>
+  <input id="unlockInput" type="datetime-local">
+
+  <label>
+    <input type="checkbox" id="lockedInput">
+    Принудительно закрыта
+  </label>
+
+  <label>👥 Видимость для команд (через запятую)</label>
+  <input id="visibleInput" placeholder="Например: 1,2,3">
+
+  <button id="saveBtn">Сохранить изменения</button>
+  <button id="deleteBtn" class="red">Удалить точку</button>
+
+  <h3>💾 Экспорт</h3>
+  <button id="saveJsonBtn">Скачать points.json</button>
+
+  <h3>📍 Список точек</h3>
+  <div id="pointsList"></div>
+
+</div>
+
+<div id="map-wrapper">
+  <div id="map-container">
+    <img src="assets/map.svg" id="map">
+    <div id="points-layer"></div>
+  </div>
+</div>
+
+<script>
+
+let points = [];
+let selectedId = null;
+let addMode = false;
+
+const layer = document.getElementById("points-layer");
+const list = document.getElementById("pointsList");
+const container = document.getElementById("map-container");
+const wrapper = document.getElementById("map-wrapper");
+
+const titleInput = document.getElementById("titleInput");
+const descInput = document.getElementById("descInput");
+const typeInput = document.getElementById("typeInput");
+const unlockInput = document.getElementById("unlockInput");
+const lockedInput = document.getElementById("lockedInput");
+const visibleInput = document.getElementById("visibleInput");
+
+/* ===========================
+   📦 Загрузка points.json
+=========================== */
+
+async function loadData(){
+  const response = await fetch("points.json");
+  points = await response.json();
+  render();
+}
+
+/* ===========================
+   🗺 Render
+=========================== */
+
+function render(){
+  layer.innerHTML="";
+  list.innerHTML="";
+
+  points.forEach(p=>{
+
+    const img=document.createElement("img");
+    img.src="assets/icons/"+p.type+".png";
+    img.className="point";
+    img.style.left=p.x+"%";
+    img.style.top=p.y+"%";
+
+    if(p.id===selectedId)
+      img.classList.add("selected");
+
+    img.onclick=e=>{
+      e.stopPropagation();
+      selectPoint(p.id);
+    };
+
+    layer.appendChild(img);
+
+    const item=document.createElement("div");
+    item.className="point-item";
+    if(p.id===selectedId)
+      item.classList.add("active");
+
+    item.innerText=p.title||"Без названия";
+    item.onclick=()=>selectPoint(p.id);
+
+    list.appendChild(item);
+  });
+}
+
+/* ===========================
+   📍 Выбор точки
+=========================== */
+
+function selectPoint(id){
+  selectedId=id;
+  const p=points.find(pt=>pt.id===id);
+  if(!p)return;
+
+  titleInput.value=p.title||"";
+  descInput.value=p.desc||"";
+  typeInput.value=p.type;
+  unlockInput.value=p.unlock||"";
+  lockedInput.checked=p.locked||false;
+  visibleInput.value=(p.visible_for||[]).join(",");
+
+  render();
+}
+
+/* ===========================
+   ➕ Добавление
+=========================== */
+
+addModeBtn.onclick=()=>{
+  addMode=!addMode;
+  wrapper.style.cursor=addMode?"crosshair":"grab";
+};
+
+wrapper.onclick=e=>{
+  if(!addMode)return;
+
+  const rect=container.getBoundingClientRect();
+  const x=((e.clientX-rect.left)/rect.width)*100;
+  const y=((e.clientY-rect.top)/rect.height)*100;
+
+  const id=Date.now();
+
+  points.push({
+    id,
+    title:"Новая точка",
+    desc:"",
+    type:"quest",
+    x,
+    y,
+    unlock:"",
+    locked:false,
+    visible_for:[]
+  });
+
+  selectPoint(id);
+};
+
+/* ===========================
+   💾 Сохранение
+=========================== */
+
+saveBtn.onclick=()=>{
+  const p=points.find(pt=>pt.id===selectedId);
+  if(!p)return;
+
+  p.title=titleInput.value;
+  p.desc=descInput.value;
+  p.type=typeInput.value;
+  p.unlock=unlockInput.value;
+  p.locked=lockedInput.checked;
+
+  p.visible_for = visibleInput.value
+    ? visibleInput.value.split(",").map(v=>v.trim())
+    : [];
+
+  render();
+};
+
+/* ===========================
+   🗑 Удаление
+=========================== */
+
+deleteBtn.onclick=()=>{
+  if(!selectedId)return;
+  points=points.filter(p=>p.id!==selectedId);
+  selectedId=null;
+  render();
+};
+
+/* ===========================
+   📥 Экспорт JSON
+=========================== */
+
+saveJsonBtn.onclick=()=>{
+  const jsonString=JSON.stringify(points,null,2);
+  const blob=new Blob(
+    ["\uFEFF"+jsonString],
+    {type:"application/json;charset=utf-8;"}
+  );
+
+  const link=document.createElement("a");
+  link.href=URL.createObjectURL(blob);
+  link.download="points.json";
+  link.click();
+};
+
+/* ===========================
+   🚀 INIT
+=========================== */
+
+loadData();
+
+</script>
+
+</body>
+</html>
