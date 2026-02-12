@@ -219,9 +219,13 @@ function initMapControls() {
   let posY = 0;
   let scale = 1;
 
+  let velocityX = 0;
+  let velocityY = 0;
+  let lastX = 0;
+  let lastY = 0;
+  let lastTime = 0;
+
   let isDragging = false;
-  let startX = 0;
-  let startY = 0;
 
   let initialDistance = null;
   let initialScale = 1;
@@ -238,6 +242,42 @@ function initMapControls() {
     );
   }
 
+  function getCenter(t1, t2) {
+    return {
+      x: (t1.clientX + t2.clientX) / 2,
+      y: (t1.clientY + t2.clientY) / 2
+    };
+  }
+
+  function clampPosition() {
+
+    const rect = wrapper.getBoundingClientRect();
+    const mapWidth = container.offsetWidth * scale;
+    const mapHeight = container.offsetHeight * scale;
+
+    const minX = Math.min(0, rect.width - mapWidth);
+    const minY = Math.min(0, rect.height - mapHeight);
+
+    posX = Math.max(minX, Math.min(0, posX));
+    posY = Math.max(minY, Math.min(0, posY));
+  }
+
+  function animateInertia() {
+
+    if (Math.abs(velocityX) < 0.1 && Math.abs(velocityY) < 0.1) return;
+
+    posX += velocityX;
+    posY += velocityY;
+
+    velocityX *= 0.95;
+    velocityY *= 0.95;
+
+    clampPosition();
+    update();
+
+    requestAnimationFrame(animateInertia);
+  }
+
   /* =========================
      TOUCH START
   ========================= */
@@ -245,16 +285,23 @@ function initMapControls() {
   wrapper.addEventListener("touchstart", (e) => {
 
     if (e.touches.length === 1) {
+
       isDragging = true;
       const touch = e.touches[0];
-      startX = touch.clientX - posX;
-      startY = touch.clientY - posY;
+
+      lastX = touch.clientX;
+      lastY = touch.clientY;
+      lastTime = Date.now();
+
     }
 
     if (e.touches.length === 2) {
+
       isDragging = false;
+
       initialDistance = getDistance(e.touches[0], e.touches[1]);
       initialScale = scale;
+
     }
 
   }, { passive: false });
@@ -265,25 +312,52 @@ function initMapControls() {
 
   wrapper.addEventListener("touchmove", (e) => {
 
-    e.preventDefault(); // 🔥 КЛЮЧЕВОЕ
+    e.preventDefault();
 
     if (e.touches.length === 1 && isDragging) {
 
       const touch = e.touches[0];
-      posX = touch.clientX - startX;
-      posY = touch.clientY - startY;
+
+      const now = Date.now();
+      const dx = touch.clientX - lastX;
+      const dy = touch.clientY - lastY;
+
+      posX += dx;
+      posY += dy;
+
+      velocityX = dx / (now - lastTime) * 16;
+      velocityY = dy / (now - lastTime) * 16;
+
+      lastX = touch.clientX;
+      lastY = touch.clientY;
+      lastTime = now;
+
+      clampPosition();
       update();
     }
 
     if (e.touches.length === 2) {
 
       const newDistance = getDistance(e.touches[0], e.touches[1]);
-
       if (!initialDistance) return;
 
       const zoomFactor = newDistance / initialDistance;
+      const newScale = Math.min(Math.max(initialScale * zoomFactor, 0.5), 3);
 
-      scale = Math.min(Math.max(initialScale * zoomFactor, 0.5), 3);
+      const center = getCenter(e.touches[0], e.touches[1]);
+
+      const rect = wrapper.getBoundingClientRect();
+      const offsetX = center.x - rect.left;
+      const offsetY = center.y - rect.top;
+
+      const scaleRatio = newScale / scale;
+
+      posX = offsetX - scaleRatio * (offsetX - posX);
+      posY = offsetY - scaleRatio * (offsetY - posY);
+
+      scale = newScale;
+
+      clampPosition();
       update();
     }
 
@@ -294,39 +368,66 @@ function initMapControls() {
   ========================= */
 
   wrapper.addEventListener("touchend", () => {
-    initialDistance = null;
+
     isDragging = false;
+    initialDistance = null;
+
+    animateInertia();
   });
 
   /* =========================
-     MOUSE (ПК)
+     MOUSE (для ПК)
   ========================= */
 
   wrapper.addEventListener("mousedown", e => {
     isDragging = true;
-    startX = e.clientX - posX;
-    startY = e.clientY - posY;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    lastTime = Date.now();
   });
 
   wrapper.addEventListener("mousemove", e => {
+
     if (!isDragging) return;
-    posX = e.clientX - startX;
-    posY = e.clientY - startY;
+
+    const now = Date.now();
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+
+    posX += dx;
+    posY += dy;
+
+    velocityX = dx / (now - lastTime) * 16;
+    velocityY = dy / (now - lastTime) * 16;
+
+    lastX = e.clientX;
+    lastY = e.clientY;
+    lastTime = now;
+
+    clampPosition();
     update();
   });
 
-  wrapper.addEventListener("mouseup", () => isDragging = false);
-  wrapper.addEventListener("mouseleave", () => isDragging = false);
+  wrapper.addEventListener("mouseup", () => {
+    isDragging = false;
+    animateInertia();
+  });
+
+  wrapper.addEventListener("mouseleave", () => {
+    isDragging = false;
+  });
 
   /* =========================
-     Zoom через кнопки
+     Zoom кнопками
   ========================= */
 
   window.__mapZoom = value => {
     scale = Math.min(Math.max(value, 0.5), 3);
+    clampPosition();
     update();
   };
 }
+
 
 
 
@@ -346,6 +447,7 @@ function initZoom() {
     window.__mapZoom(zoomLevel);
   };
 }
+
 
 
 
