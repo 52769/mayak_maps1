@@ -10,7 +10,9 @@ document.addEventListener("DOMContentLoaded", () => {
   initApp();
 });
 
-/* ========================= */
+/* =========================
+   🚀 INIT
+========================= */
 
 async function initApp() {
   await waitForTelegram();
@@ -35,16 +37,14 @@ function waitForTelegram() {
   });
 }
 
-/* ========================= */
+/* =========================
+   👤 Загрузка пользователя
+========================= */
 
 async function loadUser() {
 
   const tg = window.Telegram?.WebApp;
-
-  if (!tg) {
-    log("Telegram WebApp not found");
-    return;
-  }
+  if (!tg) return;
 
   tg.ready();
 
@@ -62,7 +62,6 @@ async function loadUser() {
   const telegram_id = tg.initDataUnsafe.user.id;
 
   try {
-
     const response = await fetch(API + "/me", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -75,35 +74,31 @@ async function loadUser() {
     }
 
     const data = await response.json();
-
     TEAM_NUMBER = data.team_number;
     ROLE = data.role;
 
     updateTeamInfo();
 
   } catch (err) {
-    log("User API error: " + err.message);
+    log("User API error");
   }
 }
 
-/* ========================= */
+/* =========================
+   📍 Загрузка точек
+========================= */
 
 async function loadPoints() {
 
-  if (!TEAM_NUMBER) {
-    log("TEAM_NUMBER not set");
-    return;
-  }
+  if (!TEAM_NUMBER) return;
 
   try {
-
     const response = await fetch(
       API + "/points?team_number=" + encodeURIComponent(TEAM_NUMBER)
     );
 
     if (!response.ok) {
-      const text = await response.text();
-      log("Points API error: " + text);
+      log("Points API error");
       return;
     }
 
@@ -115,11 +110,13 @@ async function loadPoints() {
     renderPoints();
 
   } catch (err) {
-    log("Points fetch failed: " + err.message);
+    log("Points fetch failed");
   }
 }
 
-/* ========================= */
+/* =========================
+   🗺 Рендер точек
+========================= */
 
 function renderPoints() {
 
@@ -139,23 +136,72 @@ function renderPoints() {
       !point.visible_for.includes(String(TEAM_NUMBER))
     ) return;
 
-    const el = document.createElement("div");
-    el.className = "point";
+    const img = document.createElement("img");
+
+    img.src = "assets/icons/" + point.type + ".png";
+    img.className = "point";
+    img.style.left = point.x + "%";
+    img.style.top = point.y + "%";
 
     if (completedPoints.includes(point.id))
-      el.classList.add("completed");
+      img.classList.add("completed");
 
     if (point.locked)
-      el.classList.add("locked");
+      img.classList.add("locked");
 
-    el.style.left = point.x + "%";
-    el.style.top = point.y + "%";
+    img.onclick = () => openModal(point);
 
-    layer.appendChild(el);
+    layer.appendChild(img);
   });
 }
 
-/* ========================= */
+/* =========================
+   🪟 Модальное окно
+========================= */
+
+function openModal(point) {
+
+  const modal = document.getElementById("modal");
+  const title = document.getElementById("modal-title");
+  const desc = document.getElementById("modal-desc");
+  const meta = document.getElementById("modal-meta");
+  const completeBtn = document.getElementById("complete-btn");
+  const closeBtn = document.getElementById("close-btn");
+
+  title.innerText = point.title || "Без названия";
+  desc.innerText = point.desc || "";
+  meta.innerText = "Тип: " + point.type;
+
+  modal.style.display = "block";
+
+  closeBtn.onclick = () => {
+    modal.style.display = "none";
+  };
+
+  completeBtn.onclick = async () => {
+
+    try {
+      await fetch(API + "/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          team_number: TEAM_NUMBER,
+          point_id: point.id
+        })
+      });
+
+      modal.style.display = "none";
+      loadPoints();
+
+    } catch (err) {
+      log("Complete error");
+    }
+  };
+}
+
+/* =========================
+   🎛 Фильтры
+========================= */
 
 function initFilters() {
   document.querySelectorAll(".filter-btn").forEach(btn => {
@@ -169,7 +215,9 @@ function initFilters() {
   });
 }
 
-/* ========================= */
+/* =========================
+   👥 Инфо о команде
+========================= */
 
 function updateTeamInfo() {
   const teamInfo = document.getElementById("team-info");
@@ -179,7 +227,9 @@ function updateTeamInfo() {
     `Команда: ${TEAM_NUMBER}<br>Роль: ${ROLE}`;
 }
 
-/* ========================= */
+/* =========================
+   🖐 Перемещение карты
+========================= */
 
 function initMapControls() {
 
@@ -213,7 +263,9 @@ function initMapControls() {
   });
 }
 
-/* ========================= */
+/* =========================
+   🐞 Debug
+========================= */
 
 function log(msg) {
   const debug = document.getElementById("debug");
