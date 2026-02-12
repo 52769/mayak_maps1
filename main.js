@@ -231,11 +231,18 @@ function initMapControls() {
       `translate(${posX}px, ${posY}px) scale(${scale})`;
   }
 
+  function getDistance(t1, t2) {
+    return Math.hypot(
+      t2.clientX - t1.clientX,
+      t2.clientY - t1.clientY
+    );
+  }
+
   /* =========================
-     🖐 Drag одним пальцем
+     TOUCH START
   ========================= */
 
-  wrapper.addEventListener("touchstart", e => {
+  wrapper.addEventListener("touchstart", (e) => {
 
     if (e.touches.length === 1) {
       isDragging = true;
@@ -249,9 +256,16 @@ function initMapControls() {
       initialDistance = getDistance(e.touches[0], e.touches[1]);
       initialScale = scale;
     }
-  });
 
-  wrapper.addEventListener("touchmove", e => {
+  }, { passive: false });
+
+  /* =========================
+     TOUCH MOVE
+  ========================= */
+
+  wrapper.addEventListener("touchmove", (e) => {
+
+    e.preventDefault(); // 🔥 КЛЮЧЕВОЕ
 
     if (e.touches.length === 1 && isDragging) {
 
@@ -272,19 +286,20 @@ function initMapControls() {
       scale = Math.min(Math.max(initialScale * zoomFactor, 0.5), 3);
       update();
     }
-  });
 
-  wrapper.addEventListener("touchend", e => {
-    if (e.touches.length < 2) {
-      initialDistance = null;
-    }
-    if (e.touches.length === 0) {
-      isDragging = false;
-    }
+  }, { passive: false });
+
+  /* =========================
+     TOUCH END
+  ========================= */
+
+  wrapper.addEventListener("touchend", () => {
+    initialDistance = null;
+    isDragging = false;
   });
 
   /* =========================
-     🖱 Drag мышкой (для ПК)
+     MOUSE (ПК)
   ========================= */
 
   wrapper.addEventListener("mousedown", e => {
@@ -304,18 +319,7 @@ function initMapControls() {
   wrapper.addEventListener("mouseleave", () => isDragging = false);
 
   /* =========================
-     📏 Вспомогательная функция
-  ========================= */
-
-  function getDistance(touch1, touch2) {
-    return Math.hypot(
-      touch2.clientX - touch1.clientX,
-      touch2.clientY - touch1.clientY
-    );
-  }
-
-  /* =========================
-     🔍 Поддержка кнопочного zoom
+     Zoom через кнопки
   ========================= */
 
   window.__mapZoom = value => {
@@ -323,6 +327,7 @@ function initMapControls() {
     update();
   };
 }
+
 
 
 /* ========================= */
@@ -341,6 +346,7 @@ function initZoom() {
     window.__mapZoom(zoomLevel);
   };
 }
+
 
 
 
