@@ -215,17 +215,77 @@ function initMapControls() {
   const container = document.getElementById("map-container");
   const wrapper = document.getElementById("map-wrapper");
 
-  let isDragging = false;
-  let startX = 0;
-  let startY = 0;
   let posX = 0;
   let posY = 0;
   let scale = 1;
+
+  let isDragging = false;
+  let startX = 0;
+  let startY = 0;
+
+  let initialDistance = null;
+  let initialScale = 1;
 
   function update() {
     container.style.transform =
       `translate(${posX}px, ${posY}px) scale(${scale})`;
   }
+
+  /* =========================
+     🖐 Drag одним пальцем
+  ========================= */
+
+  wrapper.addEventListener("touchstart", e => {
+
+    if (e.touches.length === 1) {
+      isDragging = true;
+      const touch = e.touches[0];
+      startX = touch.clientX - posX;
+      startY = touch.clientY - posY;
+    }
+
+    if (e.touches.length === 2) {
+      isDragging = false;
+      initialDistance = getDistance(e.touches[0], e.touches[1]);
+      initialScale = scale;
+    }
+  });
+
+  wrapper.addEventListener("touchmove", e => {
+
+    if (e.touches.length === 1 && isDragging) {
+
+      const touch = e.touches[0];
+      posX = touch.clientX - startX;
+      posY = touch.clientY - startY;
+      update();
+    }
+
+    if (e.touches.length === 2) {
+
+      const newDistance = getDistance(e.touches[0], e.touches[1]);
+
+      if (!initialDistance) return;
+
+      const zoomFactor = newDistance / initialDistance;
+
+      scale = Math.min(Math.max(initialScale * zoomFactor, 0.5), 3);
+      update();
+    }
+  });
+
+  wrapper.addEventListener("touchend", e => {
+    if (e.touches.length < 2) {
+      initialDistance = null;
+    }
+    if (e.touches.length === 0) {
+      isDragging = false;
+    }
+  });
+
+  /* =========================
+     🖱 Drag мышкой (для ПК)
+  ========================= */
 
   wrapper.addEventListener("mousedown", e => {
     isDragging = true;
@@ -243,24 +303,27 @@ function initMapControls() {
   wrapper.addEventListener("mouseup", () => isDragging = false);
   wrapper.addEventListener("mouseleave", () => isDragging = false);
 
-  wrapper.addEventListener("touchstart", e => {
-    const touch = e.touches[0];
-    startX = touch.clientX - posX;
-    startY = touch.clientY - posY;
-  });
+  /* =========================
+     📏 Вспомогательная функция
+  ========================= */
 
-  wrapper.addEventListener("touchmove", e => {
-    const touch = e.touches[0];
-    posX = touch.clientX - startX;
-    posY = touch.clientY - startY;
-    update();
-  });
+  function getDistance(touch1, touch2) {
+    return Math.hypot(
+      touch2.clientX - touch1.clientX,
+      touch2.clientY - touch1.clientY
+    );
+  }
+
+  /* =========================
+     🔍 Поддержка кнопочного zoom
+  ========================= */
 
   window.__mapZoom = value => {
     scale = Math.min(Math.max(value, 0.5), 3);
     update();
   };
 }
+
 
 /* ========================= */
 
@@ -278,5 +341,6 @@ function initZoom() {
     window.__mapZoom(zoomLevel);
   };
 }
+
 
 
