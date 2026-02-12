@@ -152,11 +152,14 @@ function openModal(point) {
 
     try {
 
+      const tg = window.Telegram?.WebApp;
+      const telegram_id = tg?.initDataUnsafe?.user?.id;
+      
       const response = await fetch(API + "/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          team_number: TEAM_NUMBER,
+          telegram_id: telegram_id,
           point_id: point.id
         })
       });
@@ -273,3 +276,4 @@ function initZoom() {
     window.__mapZoom(zoomLevel);
   };
 }
+
