@@ -2,64 +2,54 @@ const API = "https://mayakmaps-production.up.railway.app/api";
 
 let TEAM_NUMBER = null;
 let ROLE = null;
-
 let pointsData = [];
 let completedPoints = [];
 let currentFilter = "all";
-let activePoint = null;
 
 document.addEventListener("DOMContentLoaded", () => {
-  initApp();
+  safeInit();
 });
 
-async function initApp() {
-  await waitForTelegram();
-  await loadUser();
-  await loadPoints();
+async function safeInit() {
+  try {
+    await loadUser();
+  } catch (e) {
+    console.error("loadUser failed", e);
+  }
+
+  try {
+    await loadPoints();
+  } catch (e) {
+    console.error("loadPoints failed", e);
+  }
+
   initFilters();
   initMapControls();
 }
 
-/* =========================
-   🧠 Ждём Telegram
-========================= */
-
-function waitForTelegram() {
-  return new Promise(resolve => {
-    const check = () => {
-      if (window.Telegram && window.Telegram.WebApp) {
-        resolve();
-      } else {
-        setTimeout(check, 100);
-      }
-    };
-    check();
-  });
-}
-
-/* =========================
-   👤 USER
-========================= */
+/* ========================= */
 
 async function loadUser() {
+  const tg = window.Telegram?.WebApp;
+
+  if (!tg?.initDataUnsafe?.user) {
+    console.warn("Telegram user not detected");
+    return;
+  }
+
+  const telegram_id = tg.initDataUnsafe.user.id;
+
   try {
-
-    const tg = window.Telegram?.WebApp;
-
-    if (!tg?.initDataUnsafe?.user) {
-      console.warn("Telegram user not available");
-      return;
-    }
-
-    const telegram_id = tg.initDataUnsafe.user.id;
-
     const response = await fetch(API + "/me", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ telegram_id })
     });
 
-    if (!response.ok) throw new Error("User API error");
+    if (!response.ok) {
+      console.warn("User not found in DB");
+      return;
+    }
 
     const data = await response.json();
 
@@ -69,13 +59,11 @@ async function loadUser() {
     updateTeamInfo();
 
   } catch (err) {
-    console.error("loadUser:", err);
+    console.error("API error:", err);
   }
 }
 
-/* =========================
-   📦 POINTS
-========================= */
+/* ========================= */
 
 async function loadPoints() {
 
@@ -87,7 +75,7 @@ async function loadPoints() {
       API + "/points?team_number=" + TEAM_NUMBER
     );
 
-    if (!response.ok) throw new Error("Points API error");
+    if (!response.ok) return;
 
     const data = await response.json();
 
@@ -97,13 +85,11 @@ async function loadPoints() {
     renderPoints();
 
   } catch (err) {
-    console.error("loadPoints:", err);
+    console.error("Points error:", err);
   }
 }
 
-/* =========================
-   📍 RENDER
-========================= */
+/* ========================= */
 
 function renderPoints() {
 
@@ -128,41 +114,25 @@ function renderPoints() {
     el.style.left = point.x + "%";
     el.style.top = point.y + "%";
 
-    if (completedPoints.includes(point.id))
-      el.classList.add("completed");
-
-    el.addEventListener("click", () => openModal(point));
-
     layer.appendChild(el);
   });
 }
 
-/* =========================
-   📄 MODAL
-========================= */
+/* ========================= */
 
-function openModal(point) {
-
-  activePoint = point;
-
-  const modal = document.getElementById("modal");
-  if (!modal) return;
-
-  document.getElementById("modal-title").innerText = point.title || "";
-  document.getElementById("modal-desc").innerText = point.desc || "";
-
-  modal.style.display = "block";
+function initFilters() {
+  document.querySelectorAll(".filter-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".filter-btn")
+        .forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      currentFilter = btn.dataset.type;
+      renderPoints();
+    });
+  });
 }
 
-document.addEventListener("click", e => {
-  if (e.target.id === "close-btn") {
-    document.getElementById("modal").style.display = "none";
-  }
-});
-
-/* =========================
-   👥 TEAM INFO
-========================= */
+/* ========================= */
 
 function updateTeamInfo() {
   const teamInfo = document.getElementById("team-info");
@@ -173,9 +143,7 @@ function updateTeamInfo() {
      Роль: ${ROLE}`;
 }
 
-/* =========================
-   🗺 MAP CONTROLS
-========================= */
+/* ========================= */
 
 function initMapControls() {
 
@@ -188,50 +156,24 @@ function initMapControls() {
   let posX = 0;
   let posY = 0;
 
-  let startX = 0;
-  let startY = 0;
-  let isDragging = false;
-
   function update() {
     container.style.transform =
       `translate(${posX}px, ${posY}px) scale(${scale})`;
   }
 
-  /* Mouse */
-  wrapper.addEventListener("mousedown", e => {
-    isDragging = true;
-    startX = e.clientX - posX;
-    startY = e.clientY - posY;
-  });
-
-  window.addEventListener("mouseup", () => {
-    isDragging = false;
-  });
-
-  window.addEventListener("mousemove", e => {
-    if (!isDragging) return;
-    posX = e.clientX - startX;
-    posY = e.clientY - startY;
-    update();
-  });
-
-  /* Touch drag */
   wrapper.addEventListener("touchstart", e => {
     if (e.touches.length === 1) {
-      isDragging = true;
-      startX = e.touches[0].clientX - posX;
-      startY = e.touches[0].clientY - posY;
+      wrapper.dataset.startX = e.touches[0].clientX - posX;
+      wrapper.dataset.startY = e.touches[0].clientY - posY;
     }
   });
 
   wrapper.addEventListener("touchmove", e => {
-    if (!isDragging) return;
-    posX = e.touches[0].clientX - startX;
-    posY = e.touches[0].clientY - startY;
-    update();
+    if (e.touches.length === 1) {
+      posX = e.touches[0].clientX - wrapper.dataset.startX;
+      posY = e.touches[0].clientY - wrapper.dataset.startY;
+      update();
+    }
   });
 
-  wrapper.addEventListener("touchend", () => {
-    isDragging = false;
-  });
 }
