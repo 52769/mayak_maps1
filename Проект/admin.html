@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Админ-панель квеста</title>
+<title>Админ-панель</title>
 
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
@@ -46,16 +46,6 @@ button{
 }
 
 button.red{ background:#e74c3c; }
-button.gray{ background:#888; }
-
-input{
-  width:100%;
-  padding:8px;
-  border-radius:8px;
-  border:1px solid #ddd;
-  margin-top:6px;
-  box-sizing:border-box;
-}
 
 .progress{
   height:8px;
@@ -73,7 +63,7 @@ input{
 </head>
 <body>
 
-<header>⚙ Админ-панель квеста</header>
+<header>⚙ Админ-панель</header>
 
 <div class="section">
 
@@ -83,79 +73,88 @@ input{
   <h3>👥 Команды</h3>
   <div id="teams"></div>
 
-  <div class="card">
-    <h4>➕ Создать команду</h4>
-    <input id="newTeamName" placeholder="Название команды">
-    <button onclick="createTeam()">Создать</button>
-  </div>
-
   <h3>📍 Точки</h3>
   <div id="points"></div>
 
 </div>
 
 <script>
-const tg = window.Telegram.WebApp;
-tg.ready();
-tg.expand();
-
-/* ========================
-   🔗 API URL
-======================== */
-const API = "https://your-backend-url.com/api";
-
-/* ========================
-   📦 Загрузка данных
-======================== */
-async function loadData(){
-  const teams = await fetch(API+"/teams").then(r=>r.json());
-  const rating = await fetch(API+"/rating").then(r=>r.json());
-  const points = await fetch(API+"/points").then(r=>r.json());
-
-  renderRating(rating);
-  renderTeams(teams, points.length);
-  renderPoints(points);
+const tg = window.Telegram?.WebApp;
+if (tg) {
+  tg.ready();
+  tg.expand();
 }
 
-/* ========================
+const API = "https://your-backend-url.com/api";
+
+let ratingData = [];
+let pointsData = [];
+
+/* =========================
+   📦 Загрузка данных
+========================= */
+
+async function loadData(){
+
+  const ratingResponse = await fetch(API + "/rating");
+  ratingData = await ratingResponse.json();
+
+  const pointsResponse = await fetch("points.json");
+  pointsData = await pointsResponse.json();
+
+  renderRating();
+  renderTeams();
+  renderPoints();
+}
+
+/* =========================
    🏆 Рейтинг
-======================== */
-function renderRating(rating){
+========================= */
+
+function renderRating(){
   const container=document.getElementById("rating");
   container.innerHTML="";
 
-  rating.forEach((t,i)=>{
+  if(!ratingData.length){
+    container.innerHTML="<div class='card'>Нет данных</div>";
+    return;
+  }
+
+  ratingData.forEach((item,index)=>{
     container.innerHTML+=`
       <div class="card">
-        ${i+1}. <b>${t.name}</b> — ${t.score} очков
+        ${index+1}. Команда <b>${item.name || item[0]}</b>
+        — ${item.score || item[1]} очков
       </div>
     `;
   });
 }
 
-/* ========================
+/* =========================
    👥 Команды
-======================== */
-function renderTeams(teams,totalPoints){
+========================= */
+
+function renderTeams(){
+
   const container=document.getElementById("teams");
   container.innerHTML="";
 
-  teams.forEach(team=>{
-    const percent = totalPoints
-      ? Math.round((team.completed.length/totalPoints)*100)
-      : 0;
+  if(!ratingData.length){
+    container.innerHTML="<div class='card'>Пока нет прогресса</div>";
+    return;
+  }
+
+  ratingData.forEach(item=>{
+
+    const team = item.name || item[0];
+    const score = item.score || item[1];
 
     container.innerHTML+=`
       <div class="card">
-        <b>${team.name}</b><br>
-        🔑 Ключ: <code>${team.auth_key}</code><br>
-        Пройдено: ${team.completed.length}/${totalPoints}
-
-        <div class="progress">
-          <div class="progress-bar" style="width:${percent}%"></div>
-        </div>
-
-        <button onclick="resetTeam(${team.id})" class="red">
+        <b>Команда ${team}</b><br>
+        Пройдено точек: ${score}
+        <br>
+        <button class="red" onclick="resetTeam('${team}')">
           Сбросить прогресс
         </button>
       </div>
@@ -163,57 +162,41 @@ function renderTeams(teams,totalPoints){
   });
 }
 
-async function resetTeam(id){
-  await fetch(API+"/teams/"+id+"/reset",{method:"POST"});
-  loadData();
-}
+async function resetTeam(team){
+  if(!confirm("Сбросить прогресс команды "+team+"?")) return;
 
-/* ========================
-   ➕ Создание команды
-======================== */
-async function createTeam(){
-  const name=document.getElementById("newTeamName").value;
-  if(!name) return alert("Введите название");
-
-  await fetch(API+"/teams",{
+  await fetch(API + "/reset-team",{
     method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body:JSON.stringify({name})
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({team_number:team})
   });
 
-  document.getElementById("newTeamName").value="";
   loadData();
 }
 
-/* ========================
+/* =========================
    📍 Точки
-======================== */
-function renderPoints(points){
+========================= */
+
+function renderPoints(){
   const container=document.getElementById("points");
   container.innerHTML="";
 
-  points.forEach(p=>{
+  pointsData.forEach(p=>{
     container.innerHTML+=`
       <div class="card">
         <b>${p.title}</b><br>
-        Статус: ${p.locked ? "🔒 Закрыта" : "🔓 Открыта"}
-        <br>
-        <button onclick="togglePoint(${p.id})">
-          ${p.locked ? "Открыть" : "Закрыть"}
-        </button>
+        Тип: ${p.type}<br>
+        Locked: ${p.locked ? "Да" : "Нет"}
       </div>
     `;
   });
 }
 
-async function togglePoint(id){
-  await fetch(API+"/points/"+id+"/toggle",{method:"POST"});
-  loadData();
-}
-
-/* ========================
+/* =========================
    🚀 INIT
-======================== */
+========================= */
+
 loadData();
 </script>
 
