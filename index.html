@@ -7,14 +7,10 @@
 
 <title>Интерактивная карта</title>
 
-<!-- Telegram WebApp -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-
 <link rel="stylesheet" href="styles.css" />
 
 <style>
-/* Минимальные гарантированные стили */
-
 #team-info {
   color: #000;
   font-size: 14px;
@@ -35,7 +31,7 @@
   bottom: 0;
   left: 0;
   width: 100%;
-  max-height: 40%;
+  max-height: 35%;
   overflow: auto;
   background: black;
   color: lime;
@@ -48,7 +44,6 @@
 
 <body>
 
-<!-- Верхняя панель -->
 <div id="topbar">
   <div id="team-info"></div>
 
@@ -61,54 +56,33 @@
   </div>
 </div>
 
-<!-- Карта -->
 <div id="map-wrapper">
   <div id="map-container">
-
     <img src="assets/map.svg" id="map" alt="Карта">
-
     <div id="points-layer"></div>
-
   </div>
 </div>
 
-<!-- Zoom -->
 <div id="zoom-controls">
   <button class="zoom-btn">+</button>
   <button class="zoom-btn">−</button>
 </div>
 
-<!-- Модалка -->
 <div id="modal" style="display:none;">
   <h2 id="modal-title"></h2>
   <p id="modal-desc"></p>
   <div id="modal-meta"></div>
 
-  <button id="complete-btn" class="modal-btn">
-    Отметить как пройдено
-  </button>
-
-  <button id="close-btn" class="modal-btn gray">
-    Закрыть
-  </button>
+  <button id="complete-btn">Отметить как пройдено</button>
+  <button id="close-btn">Закрыть</button>
 </div>
 
-<!-- Telegram init -->
-<script>
-if (window.Telegram && window.Telegram.WebApp) {
-  window.Telegram.WebApp.ready();
-  window.Telegram.WebApp.expand();
-}
-</script>
-
-<!-- Основная логика -->
 <script src="main.js"></script>
 
-<!-- Встроенная отладка -->
 <div id="debug"></div>
 
 <script>
-window.onerror = function(msg, url, line, col, error) {
+window.onerror = function(msg, url, line) {
   const debug = document.getElementById("debug");
   debug.innerHTML += `<div>❌ ${msg} (line ${line})</div>`;
 };
