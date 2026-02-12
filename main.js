@@ -2,7 +2,6 @@
    ⚙ CONFIG
 ========================= */
 
-// ⚠ ВАЖНО: обязательно https
 const API = "https://mayakmaps-production.up.railway.app/api";
 
 let TEAM_NUMBER = null;
@@ -17,30 +16,25 @@ let activePoint = null;
    🚀 INIT
 ========================= */
 
-(async () => {
+document.addEventListener("DOMContentLoaded", async () => {
   await loadUser();
   await loadPoints();
   initFilters();
   initMapControls();
-})();
+});
 
 /* =========================
-   👤 Получение пользователя
+   👤 USER
 ========================= */
 
 async function loadUser() {
-
   try {
+    const telegram_id = window.TelegramApp?.getTelegramId();
 
-    const telegram_id = TelegramApp?.getTelegramId();
-
-    // DEV fallback
     if (!telegram_id) {
-      console.warn("DEV MODE — используем localStorage");
-
+      console.warn("DEV MODE");
       TEAM_NUMBER = localStorage.getItem("team_id") || "1";
       ROLE = localStorage.getItem("role") || "member";
-
       updateTeamInfo();
       return;
     }
@@ -51,10 +45,7 @@ async function loadUser() {
       body: JSON.stringify({ telegram_id })
     });
 
-    if (!response.ok) {
-      console.error("Ошибка получения пользователя");
-      return;
-    }
+    if (!response.ok) throw new Error("API error");
 
     const data = await response.json();
 
@@ -72,7 +63,7 @@ async function loadUser() {
 }
 
 /* =========================
-   📦 Загрузка точек
+   📦 POINTS
 ========================= */
 
 async function loadPoints() {
@@ -85,10 +76,7 @@ async function loadPoints() {
       API + "/points?team_number=" + TEAM_NUMBER
     );
 
-    if (!response.ok) {
-      console.error("Ошибка загрузки точек");
-      return;
-    }
+    if (!response.ok) throw new Error("Points API error");
 
     const data = await response.json();
 
@@ -103,13 +91,11 @@ async function loadPoints() {
 }
 
 /* =========================
-   🎛 Фильтры
+   🎛 FILTERS
 ========================= */
 
 function initFilters() {
-
   document.querySelectorAll(".filter-btn").forEach(btn => {
-
     btn.addEventListener("click", () => {
 
       document.querySelectorAll(".filter-btn")
@@ -120,36 +106,31 @@ function initFilters() {
 
       renderPoints();
     });
-
   });
 }
 
 /* =========================
-   📍 Отрисовка точек
+   📍 RENDER
 ========================= */
-
-const layer = document.getElementById("points-layer");
 
 function renderPoints() {
 
+  const layer = document.getElementById("points-layer");
   if (!layer) return;
 
   layer.innerHTML = "";
 
   pointsData.forEach(point => {
 
-    // Фильтр по типу
     if (currentFilter !== "all" && point.type !== currentFilter)
       return;
 
-    // Проверка visible_for
     if (
       point.visible_for &&
       point.visible_for.length > 0 &&
       !point.visible_for.includes(String(TEAM_NUMBER))
     ) return;
 
-    // Проверка unlock времени
     const now = new Date();
     const unlockTime = point.unlock ? new Date(point.unlock) : null;
     const lockedByTime = unlockTime && now < unlockTime;
@@ -157,11 +138,6 @@ function renderPoints() {
 
     const el = document.createElement("div");
     el.className = "point";
-
-    // если нет иконок — fallback круг
-    el.style.background = "#2AABEE";
-    el.style.borderRadius = "50%";
-
     el.style.left = point.x + "%";
     el.style.top = point.y + "%";
 
@@ -172,12 +148,10 @@ function renderPoints() {
       el.classList.add("locked");
 
     el.addEventListener("click", () => {
-
       if (locked) {
         alert("Точка пока закрыта");
         return;
       }
-
       openModal(point);
     });
 
@@ -186,23 +160,25 @@ function renderPoints() {
 }
 
 /* =========================
-   📄 Модалка
+   📄 MODAL
 ========================= */
-
-const modal = document.getElementById("modal");
-const modalTitle = document.getElementById("modal-title");
-const modalDesc = document.getElementById("modal-desc");
-const modalMeta = document.getElementById("modal-meta");
-const completeBtn = document.getElementById("complete-btn");
 
 function openModal(point) {
 
   activePoint = point;
 
-  modalTitle.innerText = point.title || "";
-  modalDesc.innerText = point.desc || "";
+  const modal = document.getElementById("modal");
+  const title = document.getElementById("modal-title");
+  const desc = document.getElementById("modal-desc");
+  const meta = document.getElementById("modal-meta");
+  const completeBtn = document.getElementById("complete-btn");
 
-  modalMeta.innerHTML = `
+  if (!modal) return;
+
+  title.innerText = point.title || "";
+  desc.innerText = point.desc || "";
+
+  meta.innerHTML = `
     Тип: ${point.type}<br>
     ID: ${point.id}
   `;
@@ -219,33 +195,34 @@ function openModal(point) {
   }
 }
 
-/* =========================
-   ✅ Засчёт точки
-========================= */
+document.getElementById("close-btn")?.addEventListener("click", () => {
+  document.getElementById("modal").style.display = "none";
+});
 
-completeBtn.addEventListener("click", () => {
+document.getElementById("complete-btn")?.addEventListener("click", () => {
 
   if (!activePoint) return;
 
-  TelegramApp.sendData({
+  window.TelegramApp?.sendData({
     type: "point_completed",
     pointId: activePoint.id
   });
 
-  modal.style.display = "none";
+  document.getElementById("modal").style.display = "none";
 
-  // Обновляем данные через секунду
   setTimeout(loadPoints, 1000);
 });
 
 /* =========================
-   👥 Обновление панели
+   👥 TEAM INFO
 ========================= */
 
 function updateTeamInfo() {
 
   const teamInfo = document.getElementById("team-info");
   if (!teamInfo) return;
+
+  teamInfo.style.color = "#000";
 
   teamInfo.innerHTML = `
     👥 Команда: <b>${TEAM_NUMBER}</b><br>
@@ -254,19 +231,21 @@ function updateTeamInfo() {
 }
 
 /* =========================
-   🗺 Zoom + Drag
+   🗺 MAP CONTROLS
 ========================= */
 
 function initMapControls() {
+
+  const container = document.getElementById("map-container");
+  const wrapper = document.getElementById("map-wrapper");
+
+  if (!container || !wrapper) return;
 
   let scale = 1;
   let posX = 0;
   let posY = 0;
   let isDragging = false;
   let startX, startY;
-
-  const container = document.getElementById("map-container");
-  const wrapper = document.getElementById("map-wrapper");
 
   function updateTransform() {
     container.style.transform =
