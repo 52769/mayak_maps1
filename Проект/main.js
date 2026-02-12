@@ -12,42 +12,36 @@ if (tg) {
    ⚙ CONFIG
 ========================= */
 
-const TEAM_ID =
-  window.TelegramApp?.teamId ||
-  localStorage.getItem("team_id") ||
-  "team_1";
+const API = "https://your-backend-url.com/api";
+
+const TEAM_ID = localStorage.getItem("team_id") || "team_1";
+const ROLE = localStorage.getItem("role") || "member";
 
 let pointsData = [];
 let currentFilter = "all";
 let activePoint = null;
+let completedPoints = [];
 
 /* =========================
-   📦 Load Points JSON
+   📦 Load Points from Backend
 ========================= */
 
 async function loadPoints() {
   try {
-    const response = await fetch("data/points.json?t=" + Date.now());
-    pointsData = await response.json();
+    const response = await fetch(
+      API + "/points?team_id=" + TEAM_ID
+    );
+
+    const data = await response.json();
+
+    pointsData = data.points;
+    completedPoints = data.completed || [];
+
     renderPoints();
+
   } catch (err) {
-    console.error("Ошибка загрузки points.json", err);
+    console.error("Ошибка загрузки точек:", err);
   }
-}
-
-/* =========================
-   💾 Team Progress
-========================= */
-
-let teamProgress = JSON.parse(
-  localStorage.getItem("progress_" + TEAM_ID) || "[]"
-);
-
-function saveProgress() {
-  localStorage.setItem(
-    "progress_" + TEAM_ID,
-    JSON.stringify(teamProgress)
-  );
 }
 
 /* =========================
@@ -56,6 +50,7 @@ function saveProgress() {
 
 document.querySelectorAll(".filter-btn").forEach(btn => {
   btn.addEventListener("click", () => {
+
     document.querySelectorAll(".filter-btn")
       .forEach(b => b.classList.remove("active"));
 
@@ -72,17 +67,30 @@ document.querySelectorAll(".filter-btn").forEach(btn => {
 const layer = document.getElementById("points-layer");
 
 function renderPoints() {
+
   layer.innerHTML = "";
 
   pointsData.forEach(point => {
 
+    /* 🔎 Фильтр типа */
     if (currentFilter !== "all" && point.type !== currentFilter)
       return;
 
+    /* 👥 Видимость для команды */
+    if (
+      point.visible_for &&
+      point.visible_for.length > 0 &&
+      !point.visible_for.includes(point.team_numeric_id)
+    ) return;
+
+    /* ⏳ Проверка времени */
     const now = new Date();
     const unlockTime = point.unlock ? new Date(point.unlock) : null;
-    const locked = unlockTime && now < unlockTime;
 
+    const lockedByTime = unlockTime && now < unlockTime;
+    const locked = point.locked || lockedByTime;
+
+    /* 📍 Создание точки */
     const el = document.createElement("img");
     el.src = "assets/icons/" + point.type + ".png";
     el.className = "point";
@@ -90,17 +98,21 @@ function renderPoints() {
     el.style.left = point.x + "%";
     el.style.top = point.y + "%";
 
-    if (teamProgress.includes(point.id))
+    /* ✅ Пройдено */
+    if (completedPoints.includes(point.id))
       el.classList.add("completed");
 
+    /* 🔒 Закрыто */
     if (locked)
       el.classList.add("locked");
 
     el.addEventListener("click", () => {
+
       if (locked) {
-        alert("Точка откроется позже");
+        alert("Точка пока закрыта");
         return;
       }
+
       openModal(point);
     });
 
@@ -115,41 +127,73 @@ function renderPoints() {
 const modal = document.getElementById("modal");
 const modalTitle = document.getElementById("modal-title");
 const modalDesc = document.getElementById("modal-desc");
+const modalMeta = document.getElementById("modal-meta");
 const completeBtn = document.getElementById("complete-btn");
 
 function openModal(point) {
+
   activePoint = point;
 
   modalTitle.innerText = point.title || "";
   modalDesc.innerText = point.desc || "";
 
+  modalMeta.innerHTML = `
+    Тип: ${point.type}<br>
+    ID: ${point.id}
+  `;
+
   modal.style.display = "block";
 
-  const alreadyCompleted = teamProgress.includes(point.id);
-  completeBtn.style.display = alreadyCompleted ? "none" : "block";
+  if (
+    ROLE !== "curator" ||
+    completedPoints.includes(point.id)
+  ) {
+    completeBtn.style.display = "none";
+  } else {
+    completeBtn.style.display = "block";
+  }
 }
 
-completeBtn.addEventListener("click", () => {
+/* =========================
+   ✅ Complete Point
+========================= */
+
+completeBtn.addEventListener("click", async () => {
 
   if (!activePoint) return;
 
-  if (!teamProgress.includes(activePoint.id)) {
-    teamProgress.push(activePoint.id);
-    saveProgress();
-  }
+  try {
 
-  modal.style.display = "none";
-  renderPoints();
-});
+    /* Отправляем в Telegram-бот */
+    if (tg) {
+      tg.sendData(JSON.stringify({
+        type: "point_completed",
+        pointId: activePoint.id
+      }));
+    }
 
-modal.addEventListener("click", (e) => {
-  if (e.target === modal) {
+    /* Также отправляем в backend */
+    await fetch(API + "/points/complete", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        team_id: TEAM_ID,
+        point_id: activePoint.id
+      })
+    });
+
     modal.style.display = "none";
+    loadPoints();
+
+  } catch (err) {
+    console.error("Ошибка отметки точки:", err);
   }
 });
 
 /* =========================
-   🗺 Zoom + Drag (Google Maps Style)
+   🔍 Zoom + Drag
 ========================= */
 
 let scale = 1;
@@ -166,53 +210,27 @@ function updateTransform() {
     `translate(${posX}px, ${posY}px) scale(${scale})`;
 }
 
-/* ====== Zoom в точку ====== */
-
-function zoomAtPoint(clientX, clientY, factor) {
-
-  const rect = wrapper.getBoundingClientRect();
-
-  const x = clientX - rect.left;
-  const y = clientY - rect.top;
-
-  const prevScale = scale;
+function zoom(factor) {
   scale *= factor;
   scale = Math.min(Math.max(scale, 0.5), 3);
-
-  posX = x - ((x - posX) * (scale / prevScale));
-  posY = y - ((y - posY) * (scale / prevScale));
-
   updateTransform();
 }
 
-/* ====== Кнопки ====== */
-
+/* Zoom buttons */
 document.querySelectorAll(".zoom-btn").forEach(btn => {
   btn.addEventListener("click", () => {
-    const rect = wrapper.getBoundingClientRect();
     const factor = btn.innerText === "+" ? 1.2 : 0.8;
-
-    zoomAtPoint(
-      rect.left + rect.width / 2,
-      rect.top + rect.height / 2,
-      factor
-    );
+    zoom(factor);
   });
 });
 
-/* ====== Колесо мыши ====== */
-
+/* Mouse wheel zoom */
 wrapper.addEventListener("wheel", (e) => {
   e.preventDefault();
-  zoomAtPoint(
-    e.clientX,
-    e.clientY,
-    e.deltaY < 0 ? 1.1 : 0.9
-  );
+  zoom(e.deltaY < 0 ? 1.1 : 0.9);
 });
 
-/* ====== Drag мышью ====== */
-
+/* Drag mouse */
 wrapper.addEventListener("mousedown", (e) => {
   isDragging = true;
   startX = e.clientX - posX;
@@ -231,18 +249,8 @@ window.addEventListener("mousemove", (e) => {
   updateTransform();
 });
 
-/* ====== Touch (1 палец — drag, 2 пальца — zoom) ====== */
-
-let initialDistance = null;
-let initialScale = 1;
-
+/* Touch drag */
 wrapper.addEventListener("touchstart", (e) => {
-
-  if (e.touches.length === 2) {
-    initialDistance = getDistance(e.touches[0], e.touches[1]);
-    initialScale = scale;
-  }
-
   if (e.touches.length === 1) {
     isDragging = true;
     startX = e.touches[0].clientX - posX;
@@ -251,23 +259,7 @@ wrapper.addEventListener("touchstart", (e) => {
 });
 
 wrapper.addEventListener("touchmove", (e) => {
-
-  if (e.touches.length === 2) {
-
-    const currentDistance = getDistance(e.touches[0], e.touches[1]);
-    const scaleFactor = currentDistance / initialDistance;
-
-    const newScale = Math.min(Math.max(initialScale * scaleFactor, 0.5), 3);
-
-    const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-    const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-
-    zoomAtPoint(centerX, centerY, newScale / scale);
-    return;
-  }
-
   if (!isDragging) return;
-
   posX = e.touches[0].clientX - startX;
   posY = e.touches[0].clientY - startY;
   updateTransform();
@@ -276,15 +268,6 @@ wrapper.addEventListener("touchmove", (e) => {
 wrapper.addEventListener("touchend", () => {
   isDragging = false;
 });
-
-/* ====== Distance helper ====== */
-
-function getDistance(t1, t2) {
-  return Math.sqrt(
-    Math.pow(t2.clientX - t1.clientX, 2) +
-    Math.pow(t2.clientY - t1.clientY, 2)
-  );
-}
 
 /* =========================
    🔄 Auto refresh
