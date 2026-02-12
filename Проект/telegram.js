@@ -6,10 +6,35 @@ const TelegramApp = (() => {
 
   const tg = window.Telegram?.WebApp;
 
+  /* =========================
+     🛑 Fallback (если не Telegram)
+  ========================= */
+
   if (!tg) {
-    console.warn("Telegram WebApp API не найдено");
-    return null;
+    console.warn("Telegram WebApp API не найдено — режим разработки");
+
+    const fallbackTeam = localStorage.getItem("team_id") || "team_1";
+    const fallbackRole = localStorage.getItem("role") || "curator";
+
+    localStorage.setItem("team_id", fallbackTeam);
+    localStorage.setItem("role", fallbackRole);
+
+    return {
+      tg: null,
+      teamId: fallbackTeam,
+      role: fallbackRole,
+      sendData: (data) => {
+        console.log("Mock sendData:", data);
+      },
+      closeApp: () => {
+        console.log("Mock close");
+      }
+    };
   }
+
+  /* =========================
+     🔧 Базовая инициализация
+  ========================= */
 
   tg.ready();
   tg.expand();
@@ -17,10 +42,11 @@ const TelegramApp = (() => {
   console.log("Telegram WebApp инициализирован");
 
   /* =========================
-     🎨 Theme (по желанию)
+     🎨 Применение темы
   ========================= */
 
   function applyTheme() {
+
     const theme = tg.themeParams;
 
     if (!theme) return;
@@ -42,57 +68,102 @@ const TelegramApp = (() => {
   }
 
   applyTheme();
-
   tg.onEvent("themeChanged", applyTheme);
 
   /* =========================
-     👥 Получение team_id
+     🔑 Получение параметров запуска
   ========================= */
 
-  function getTeamId() {
+  function parseStartParam() {
 
-    // 1️⃣ из start_param (если бот передал)
     const startParam = tg.initDataUnsafe?.start_param;
-    if (startParam) {
-      localStorage.setItem("team_id", startParam);
-      return startParam;
+
+    if (!startParam) return null;
+
+    /*
+      Формат рекомендуемый:
+      team_3:curator
+      team_2:member
+    */
+
+    const parts = startParam.split(":");
+
+    const teamId = parts[0] || "team_1";
+    const role = parts[1] || "member";
+
+    return { teamId, role };
+  }
+
+  function initAuth() {
+
+    const parsed = parseStartParam();
+
+    if (parsed) {
+      localStorage.setItem("team_id", parsed.teamId);
+      localStorage.setItem("role", parsed.role);
+      return parsed;
     }
 
-    // 2️⃣ если уже сохранён
-    const saved = localStorage.getItem("team_id");
-    if (saved) return saved;
+    /* Если уже есть сохранённые данные */
+    const savedTeam = localStorage.getItem("team_id");
+    const savedRole = localStorage.getItem("role");
 
-    // 3️⃣ fallback
-    const fallback = "team_1";
-    localStorage.setItem("team_id", fallback);
-    return fallback;
+    if (savedTeam && savedRole) {
+      return { teamId: savedTeam, role: savedRole };
+    }
+
+    /* Fallback */
+    const defaultTeam = "team_1";
+    const defaultRole = "member";
+
+    localStorage.setItem("team_id", defaultTeam);
+    localStorage.setItem("role", defaultRole);
+
+    return { teamId: defaultTeam, role: defaultRole };
   }
 
-  const teamId = getTeamId();
+  const auth = initAuth();
 
-  console.log("Team ID:", teamId);
-
-  /* =========================
-     🔘 Main Button
-  ========================= */
-
-  function showMainButton(text, callback) {
-    tg.MainButton.setText(text);
-    tg.MainButton.show();
-
-    tg.MainButton.onClick(callback);
-  }
-
-  function hideMainButton() {
-    tg.MainButton.hide();
-  }
+  console.log("Team ID:", auth.teamId);
+  console.log("Role:", auth.role);
 
   /* =========================
      📤 Отправка данных в бота
   ========================= */
 
   function sendData(data) {
-    tg.sendData(JSON.stringify(data));
+
+    if (!tg) return;
+
+    try {
+      tg.sendData(
+        typeof data === "string"
+          ? data
+          : JSON.stringify(data)
+      );
+    } catch (err) {
+      console.error("Ошибка отправки данных:", err);
+    }
+  }
+
+  /* =========================
+     🔘 Main Button (опционально)
+  ========================= */
+
+  function showMainButton(text, callback) {
+
+    tg.MainButton.setText(text);
+    tg.MainButton.show();
+
+    tg.MainButton.offClick();
+
+    tg.MainButton.onClick(() => {
+      callback();
+    });
+  }
+
+  function hideMainButton() {
+    tg.MainButton.hide();
   }
 
   /* =========================
@@ -103,12 +174,17 @@ const TelegramApp = (() => {
     tg.close();
   }
 
+  /* =========================
+     📦 Экспорт API
+  ========================= */
+
   return {
     tg,
-    teamId,
+    teamId: auth.teamId,
+    role: auth.role,
+    sendData,
     showMainButton,
     hideMainButton,
-    sendData,
     closeApp
   };
 
