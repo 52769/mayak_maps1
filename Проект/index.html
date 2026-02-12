@@ -17,14 +17,18 @@
 <body>
 
 <!-- =========================
-     🧭 ФИЛЬТРЫ
+     🧭 ВЕРХНЯЯ ПАНЕЛЬ
 ========================= -->
 <div id="topbar">
-  <button class="filter-btn active" data-type="all">Все</button>
-  <button class="filter-btn" data-type="quest">Квест</button>
-  <button class="filter-btn" data-type="info">Инфо</button>
-  <button class="filter-btn" data-type="live">Проживание</button>
-  <button class="filter-btn" data-type="finish">Финиш</button>
+  <div id="team-info"></div>
+
+  <div id="filters">
+    <button class="filter-btn active" data-type="all">Все</button>
+    <button class="filter-btn" data-type="quest">Квест</button>
+    <button class="filter-btn" data-type="info">Инфо</button>
+    <button class="filter-btn" data-type="live">Проживание</button>
+    <button class="filter-btn" data-type="finish">Финиш</button>
+  </div>
 </div>
 
 <!-- =========================
@@ -57,8 +61,14 @@
   <h2 id="modal-title"></h2>
   <p id="modal-desc"></p>
 
+  <div id="modal-meta"></div>
+
   <button id="complete-btn" class="modal-btn">
     Отметить как пройдено
+  </button>
+
+  <button id="close-btn" class="modal-btn gray">
+    Закрыть
   </button>
 </div>
 
@@ -71,6 +81,38 @@
 
 <!-- Основная логика -->
 <script src="main.js"></script>
+
+<script>
+/* =========================
+   👥 Информация о команде
+========================= */
+
+const teamInfo = document.getElementById("team-info");
+const teamId = localStorage.getItem("team_id") || "Не определена";
+const role = localStorage.getItem("role") || "member";
+
+teamInfo.innerHTML = `
+  👥 Команда: <b>${teamId}</b><br>
+  Роль: ${role === "curator" ? "Куратор" : "Участник"}
+`;
+
+/* =========================
+   🔐 Ограничение кнопки
+========================= */
+
+if (role !== "curator") {
+  const btn = document.getElementById("complete-btn");
+  if (btn) btn.style.display = "none";
+}
+
+/* =========================
+   ❌ Закрытие модалки
+========================= */
+
+document.getElementById("close-btn").addEventListener("click", () => {
+  document.getElementById("modal").style.display = "none";
+});
+</script>
 
 </body>
 </html>
