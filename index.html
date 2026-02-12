@@ -37,7 +37,7 @@
 <div id="map-wrapper">
   <div id="map-container">
 
-    <!-- ДОЛЖЕН совпадать с admin-editor -->
+    <!-- Фон карты -->
     <img src="assets/map.svg" id="map" alt="Карта территории">
 
     <!-- Слой точек -->
@@ -55,12 +55,11 @@
 </div>
 
 <!-- =========================
-     📄 МОДАЛЬНОЕ ОКНО
+     📄 МОДАЛКА
 ========================= -->
 <div id="modal">
   <h2 id="modal-title"></h2>
   <p id="modal-desc"></p>
-
   <div id="modal-meta"></div>
 
   <button id="complete-btn" class="modal-btn">
@@ -81,38 +80,6 @@
 
 <!-- Основная логика -->
 <script src="main.js"></script>
-
-<script>
-/* =========================
-   👥 Информация о команде
-========================= */
-
-const teamInfo = document.getElementById("team-info");
-const teamId = localStorage.getItem("team_id") || "Не определена";
-const role = localStorage.getItem("role") || "member";
-
-teamInfo.innerHTML = `
-  👥 Команда: <b>${teamId}</b><br>
-  Роль: ${role === "curator" ? "Куратор" : "Участник"}
-`;
-
-/* =========================
-   🔐 Ограничение кнопки
-========================= */
-
-if (role !== "curator") {
-  const btn = document.getElementById("complete-btn");
-  if (btn) btn.style.display = "none";
-}
-
-/* =========================
-   ❌ Закрытие модалки
-========================= */
-
-document.getElementById("close-btn").addEventListener("click", () => {
-  document.getElementById("modal").style.display = "none";
-});
-</script>
 
 </body>
 </html>
