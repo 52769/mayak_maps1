@@ -159,10 +159,12 @@ function openModal(point) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          team_number: TEAM_NUMBER,
           telegram_id: telegram_id,
           point_id: point.id
         })
       });
+
 
       if (!response.ok) {
         completeBtn.innerText = "Ошибка";
@@ -276,4 +278,5 @@ function initZoom() {
     window.__mapZoom(zoomLevel);
   };
 }
+
 
