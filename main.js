@@ -1,4 +1,4 @@
-const API = "https://mayakmaps-production.up.railway.app/api";
+const API = "https://web-production-ca948.up.railway.app/api";
 
 let TEAM_NUMBER = null;
 let ROLE = null;
@@ -207,3 +207,4 @@ function log(msg) {
   if (debug)
     debug.innerHTML += `<div>${msg}</div>`;
 }
+
