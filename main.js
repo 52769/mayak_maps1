@@ -12,7 +12,7 @@ if (tg) {
    ⚙ CONFIG
 ========================= */
 
-const API = "mayakmaps-production.up.railway.app/api";
+const API = "https://mayakmaps-production.up.railway.app/api";
 
 let TEAM_NUMBER = null;
 let ROLE = "member";
@@ -314,5 +314,6 @@ function updateTeamInfo() {
   await loadPoints();
   updateTransform();
 })();
+
 
 
