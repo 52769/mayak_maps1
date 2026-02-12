@@ -8,29 +8,50 @@ let completedPoints = [];
 let currentFilter = "all";
 let activePoint = null;
 
-document.addEventListener("DOMContentLoaded", async () => {
+document.addEventListener("DOMContentLoaded", () => {
+  initApp();
+});
+
+async function initApp() {
+  await waitForTelegram();
   await loadUser();
   await loadPoints();
   initFilters();
   initMapControls();
-});
+}
+
+/* =========================
+   🧠 Ждём Telegram
+========================= */
+
+function waitForTelegram() {
+  return new Promise(resolve => {
+    const check = () => {
+      if (window.Telegram && window.Telegram.WebApp) {
+        resolve();
+      } else {
+        setTimeout(check, 100);
+      }
+    };
+    check();
+  });
+}
 
 /* =========================
    👤 USER
 ========================= */
 
 async function loadUser() {
-
-  const tg = window.Telegram?.WebApp;
-
-  if (!tg || !tg.initDataUnsafe?.user) {
-    console.error("Telegram user not detected");
-    return;
-  }
-
-  const telegram_id = tg.initDataUnsafe.user.id;
-
   try {
+
+    const tg = window.Telegram?.WebApp;
+
+    if (!tg?.initDataUnsafe?.user) {
+      console.warn("Telegram user not available");
+      return;
+    }
+
+    const telegram_id = tg.initDataUnsafe.user.id;
 
     const response = await fetch(API + "/me", {
       method: "POST",
@@ -38,7 +59,7 @@ async function loadUser() {
       body: JSON.stringify({ telegram_id })
     });
 
-    if (!response.ok) throw new Error("API user error");
+    if (!response.ok) throw new Error("User API error");
 
     const data = await response.json();
 
@@ -48,7 +69,7 @@ async function loadUser() {
     updateTeamInfo();
 
   } catch (err) {
-    console.error("loadUser error:", err);
+    console.error("loadUser:", err);
   }
 }
 
@@ -76,27 +97,8 @@ async function loadPoints() {
     renderPoints();
 
   } catch (err) {
-    console.error("loadPoints error:", err);
+    console.error("loadPoints:", err);
   }
-}
-
-/* =========================
-   🎛 FILTERS
-========================= */
-
-function initFilters() {
-  document.querySelectorAll(".filter-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-
-      document.querySelectorAll(".filter-btn")
-        .forEach(b => b.classList.remove("active"));
-
-      btn.classList.add("active");
-      currentFilter = btn.dataset.type;
-
-      renderPoints();
-    });
-  });
 }
 
 /* =========================
@@ -121,11 +123,6 @@ function renderPoints() {
       !point.visible_for.includes(String(TEAM_NUMBER))
     ) return;
 
-    const now = new Date();
-    const unlockTime = point.unlock ? new Date(point.unlock) : null;
-    const lockedByTime = unlockTime && now < unlockTime;
-    const locked = point.locked || lockedByTime;
-
     const el = document.createElement("div");
     el.className = "point";
     el.style.left = point.x + "%";
@@ -134,16 +131,7 @@ function renderPoints() {
     if (completedPoints.includes(point.id))
       el.classList.add("completed");
 
-    if (locked)
-      el.classList.add("locked");
-
-    el.addEventListener("click", () => {
-      if (locked) {
-        alert("Точка пока закрыта");
-        return;
-      }
-      openModal(point);
-    });
+    el.addEventListener("click", () => openModal(point));
 
     layer.appendChild(el);
   });
@@ -158,37 +146,18 @@ function openModal(point) {
   activePoint = point;
 
   const modal = document.getElementById("modal");
+  if (!modal) return;
+
   document.getElementById("modal-title").innerText = point.title || "";
   document.getElementById("modal-desc").innerText = point.desc || "";
-  document.getElementById("modal-meta").innerHTML =
-    `Тип: ${point.type}<br>ID: ${point.id}`;
 
   modal.style.display = "block";
-
-  const completeBtn = document.getElementById("complete-btn");
-
-  if (ROLE !== "curator" || completedPoints.includes(point.id)) {
-    completeBtn.style.display = "none";
-  } else {
-    completeBtn.style.display = "block";
-  }
 }
 
-document.getElementById("close-btn")?.addEventListener("click", () => {
-  document.getElementById("modal").style.display = "none";
-});
-
-document.getElementById("complete-btn")?.addEventListener("click", () => {
-
-  if (!activePoint) return;
-
-  window.Telegram?.WebApp?.sendData(JSON.stringify({
-    type: "point_completed",
-    pointId: activePoint.id
-  }));
-
-  document.getElementById("modal").style.display = "none";
-  setTimeout(loadPoints, 1000);
+document.addEventListener("click", e => {
+  if (e.target.id === "close-btn") {
+    document.getElementById("modal").style.display = "none";
+  }
 });
 
 /* =========================
@@ -200,12 +169,12 @@ function updateTeamInfo() {
   if (!teamInfo) return;
 
   teamInfo.innerHTML =
-    `👥 Команда: <b>${TEAM_NUMBER}</b><br>
-     Роль: ${ROLE === "curator" ? "Куратор" : "Участник"}`;
+    `Команда: ${TEAM_NUMBER}<br>
+     Роль: ${ROLE}`;
 }
 
 /* =========================
-   🗺 MAP CONTROLS (TOUCH FIX)
+   🗺 MAP CONTROLS
 ========================= */
 
 function initMapControls() {
@@ -265,26 +234,4 @@ function initMapControls() {
   wrapper.addEventListener("touchend", () => {
     isDragging = false;
   });
-
-  /* Pinch zoom */
-  wrapper.addEventListener("touchmove", e => {
-    if (e.touches.length === 2) {
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      if (!wrapper._lastDistance)
-        wrapper._lastDistance = distance;
-
-      const diff = distance - wrapper._lastDistance;
-
-      scale += diff * 0.005;
-      scale = Math.min(Math.max(scale, 0.5), 3);
-
-      wrapper._lastDistance = distance;
-
-      update();
-    }
-  });
-
 }
