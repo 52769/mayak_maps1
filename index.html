@@ -8,14 +8,11 @@
 <title>Интерактивная карта</title>
 
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link rel="stylesheet" href="styles.css?v=2" />
+<link rel="stylesheet" href="styles.css?v=200" />
 </head>
 
 <body>
 
-<!-- =========================
-     🧭 Верхняя панель
-========================= -->
 <div id="topbar">
   <div id="team-info"></div>
 
@@ -28,9 +25,6 @@
   </div>
 </div>
 
-<!-- =========================
-     🗺 Карта
-========================= -->
 <div id="map-wrapper">
   <div id="map-container">
     <img src="assets/map.svg" id="map" alt="Карта">
@@ -38,17 +32,11 @@
   </div>
 </div>
 
-<!-- =========================
-     🔍 Zoom кнопки
-========================= -->
 <div id="zoom-controls">
   <button class="zoom-btn" id="zoom-in">+</button>
   <button class="zoom-btn" id="zoom-out">−</button>
 </div>
 
-<!-- =========================
-     📄 Модальное окно
-========================= -->
 <div id="modal">
   <h2 id="modal-title"></h2>
   <p id="modal-desc"></p>
@@ -63,16 +51,9 @@
   </button>
 </div>
 
-<!-- =========================
-     🐞 Debug (только для разработки)
-========================= -->
 <div id="debug"></div>
 
-<!-- =========================
-     📦 Скрипты
-========================= -->
-<script src="telegram.js?v=100"></script>
-<script src="main.js?v=100"></script>
+<script src="main.js?v=200"></script>
 
 <script>
 window.onerror = function(msg, url, line) {
@@ -85,4 +66,3 @@ window.onerror = function(msg, url, line) {
 
 </body>
 </html>
-
