@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Админ-редактор карты</title>
+<title>Редактор карты</title>
 
 <style>
 body{
@@ -128,8 +128,8 @@ button.gray{background:#888}
     Принудительно закрыта
   </label>
 
-  <h4>👥 Видимость для команд</h4>
-  <div id="teamsList"></div>
+  <label>👥 Видимость для команд (через запятую)</label>
+  <input id="visibleInput" placeholder="Например: 1,2,3">
 
   <button id="saveBtn">Сохранить изменения</button>
   <button id="deleteBtn" class="red">Удалить точку</button>
@@ -150,58 +150,43 @@ button.gray{background:#888}
 </div>
 
 <script>
-let points=[];
-let selectedId=null;
-let addMode=false;
-let teams=[];
 
-const API="https://your-backend-url.com/api";
+let points = [];
+let selectedId = null;
+let addMode = false;
 
-const layer=document.getElementById("points-layer");
-const list=document.getElementById("pointsList");
-const container=document.getElementById("map-container");
-const wrapper=document.getElementById("map-wrapper");
-const teamsList=document.getElementById("teamsList");
+const layer = document.getElementById("points-layer");
+const list = document.getElementById("pointsList");
+const container = document.getElementById("map-container");
+const wrapper = document.getElementById("map-wrapper");
 
-const titleInput=document.getElementById("titleInput");
-const descInput=document.getElementById("descInput");
-const typeInput=document.getElementById("typeInput");
-const unlockInput=document.getElementById("unlockInput");
-const lockedInput=document.getElementById("lockedInput");
+const titleInput = document.getElementById("titleInput");
+const descInput = document.getElementById("descInput");
+const typeInput = document.getElementById("typeInput");
+const unlockInput = document.getElementById("unlockInput");
+const lockedInput = document.getElementById("lockedInput");
+const visibleInput = document.getElementById("visibleInput");
 
 /* ===========================
-   📦 Загрузка
+   📦 Загрузка points.json
 =========================== */
+
 async function loadData(){
-  points=await fetch(API+"/points").then(r=>r.json());
-  teams=await fetch(API+"/teams").then(r=>r.json());
+  const response = await fetch("points.json");
+  points = await response.json();
   render();
-  renderTeamsCheckboxes();
-}
-
-/* ===========================
-   👥 Команды чекбоксы
-=========================== */
-function renderTeamsCheckboxes(){
-  teamsList.innerHTML="";
-  teams.forEach(t=>{
-    teamsList.innerHTML+=`
-      <label>
-        <input type="checkbox" value="${t.id}" class="teamCheck">
-        ${t.name}
-      </label><br>
-    `;
-  });
 }
 
 /* ===========================
    🗺 Render
 =========================== */
+
 function render(){
   layer.innerHTML="";
   list.innerHTML="";
 
   points.forEach(p=>{
+
     const img=document.createElement("img");
     img.src="assets/icons/"+p.type+".png";
     img.className="point";
@@ -233,6 +218,7 @@ function render(){
 /* ===========================
    📍 Выбор точки
 =========================== */
+
 function selectPoint(id){
   selectedId=id;
   const p=points.find(pt=>pt.id===id);
@@ -243,10 +229,7 @@ function selectPoint(id){
   typeInput.value=p.type;
   unlockInput.value=p.unlock||"";
   lockedInput.checked=p.locked||false;
-
-  document.querySelectorAll(".teamCheck").forEach(ch=>{
-    ch.checked = p.visible_for?.includes(Number(ch.value));
-  });
+  visibleInput.value=(p.visible_for||[]).join(",");
 
   render();
 }
@@ -254,6 +237,7 @@ function selectPoint(id){
 /* ===========================
    ➕ Добавление
 =========================== */
+
 addModeBtn.onclick=()=>{
   addMode=!addMode;
   wrapper.style.cursor=addMode?"crosshair":"grab";
@@ -286,6 +270,7 @@ wrapper.onclick=e=>{
 /* ===========================
    💾 Сохранение
 =========================== */
+
 saveBtn.onclick=()=>{
   const p=points.find(pt=>pt.id===selectedId);
   if(!p)return;
@@ -296,13 +281,9 @@ saveBtn.onclick=()=>{
   p.unlock=unlockInput.value;
   p.locked=lockedInput.checked;
 
-  const selectedTeams=[];
-  document.querySelectorAll(".teamCheck").forEach(ch=>{
-    if(ch.checked)
-      selectedTeams.push(Number(ch.value));
-  });
-
-  p.visible_for=selectedTeams;
+  p.visible_for = visibleInput.value
+    ? visibleInput.value.split(",").map(v=>v.trim())
+    : [];
 
   render();
 };
@@ -310,6 +291,7 @@ saveBtn.onclick=()=>{
 /* ===========================
    🗑 Удаление
 =========================== */
+
 deleteBtn.onclick=()=>{
   if(!selectedId)return;
   points=points.filter(p=>p.id!==selectedId);
@@ -320,6 +302,7 @@ deleteBtn.onclick=()=>{
 /* ===========================
    📥 Экспорт JSON
 =========================== */
+
 saveJsonBtn.onclick=()=>{
   const jsonString=JSON.stringify(points,null,2);
   const blob=new Blob(
@@ -336,7 +319,9 @@ saveJsonBtn.onclick=()=>{
 /* ===========================
    🚀 INIT
 =========================== */
+
 loadData();
+
 </script>
 
 </body>
