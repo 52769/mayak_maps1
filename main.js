@@ -119,97 +119,6 @@ function renderPoints() {
 
 /* ========================= */
 
-function openModal(point) {
-
-  const modal = document.getElementById("modal");
-  const title = document.getElementById("modal-title");
-  const desc = document.getElementById("modal-desc");
-  const meta = document.getElementById("modal-meta");
-  const completeBtn = document.getElementById("complete-btn");
-  const closeBtn = document.getElementById("close-btn");
-
-  title.innerText = point.title || "Без названия";
-  desc.innerText = point.desc || "";
-  meta.innerText = "Тип: " + point.type;
-
-  modal.style.display = "block";
-
-  closeBtn.onclick = () => modal.style.display = "none";
-
-  if (completedPoints.includes(point.id)) {
-    completeBtn.innerText = "Уже пройдено";
-    completeBtn.disabled = true;
-    return;
-  }
-
-  completeBtn.innerText = "Отметить как пройдено";
-  completeBtn.disabled = false;
-
-  completeBtn.onclick = async () => {
-
-    completeBtn.innerText = "Отмечаем...";
-    completeBtn.disabled = true;
-
-    try {
-
-      const tg = window.Telegram?.WebApp;
-      const telegram_id = tg?.initDataUnsafe?.user?.id;
-      
-      const response = await fetch(API + "/complete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          team_number: TEAM_NUMBER,
-          telegram_id: telegram_id,
-          point_id: point.id
-        })
-      });
-
-
-      if (!response.ok) {
-        completeBtn.innerText = "Ошибка";
-        completeBtn.disabled = false;
-        return;
-      }
-
-      completeBtn.innerText = "Готово ✅";
-
-      setTimeout(() => {
-        modal.style.display = "none";
-        loadPoints();
-      }, 600);
-
-    } catch {
-      completeBtn.innerText = "Ошибка сети";
-      completeBtn.disabled = false;
-    }
-  };
-}
-
-/* ========================= */
-
-function initFilters() {
-  document.querySelectorAll(".filter-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".filter-btn")
-        .forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      currentFilter = btn.dataset.type;
-      renderPoints();
-    });
-  });
-}
-
-/* ========================= */
-
-function updateTeamInfo() {
-  const teamInfo = document.getElementById("team-info");
-  teamInfo.innerHTML =
-    `Команда: ${TEAM_NUMBER}<br>Роль: ${ROLE}`;
-}
-
-/* ========================= */
-
 function initMapControls() {
 
   const container = document.getElementById("map-container");
@@ -219,38 +128,24 @@ function initMapControls() {
   let posY = 0;
   let scale = 1;
 
-  let velocityX = 0;
-  let velocityY = 0;
-  let lastX = 0;
-  let lastY = 0;
-  let lastTime = 0;
-
   let isDragging = false;
 
-  let initialDistance = null;
-  let initialScale = 1;
+  let lastX = 0;
+  let lastY = 0;
+
+  let startDistance = null;
+  let startScale = 1;
+
+  let pinchCenter = null;
+  let pinchMapX = 0;
+  let pinchMapY = 0;
 
   function update() {
     container.style.transform =
       `translate(${posX}px, ${posY}px) scale(${scale})`;
   }
 
-  function getDistance(t1, t2) {
-    return Math.hypot(
-      t2.clientX - t1.clientX,
-      t2.clientY - t1.clientY
-    );
-  }
-
-  function getCenter(t1, t2) {
-    return {
-      x: (t1.clientX + t2.clientX) / 2,
-      y: (t1.clientY + t2.clientY) / 2
-    };
-  }
-
-  function clampPosition() {
-
+  function clamp() {
     const rect = wrapper.getBoundingClientRect();
     const mapWidth = container.offsetWidth * scale;
     const mapHeight = container.offsetHeight * scale;
@@ -262,20 +157,18 @@ function initMapControls() {
     posY = Math.max(minY, Math.min(0, posY));
   }
 
-  function animateInertia() {
+  function distance(t1, t2) {
+    return Math.hypot(
+      t2.clientX - t1.clientX,
+      t2.clientY - t1.clientY
+    );
+  }
 
-    if (Math.abs(velocityX) < 0.1 && Math.abs(velocityY) < 0.1) return;
-
-    posX += velocityX;
-    posY += velocityY;
-
-    velocityX *= 0.95;
-    velocityY *= 0.95;
-
-    clampPosition();
-    update();
-
-    requestAnimationFrame(animateInertia);
+  function center(t1, t2) {
+    return {
+      x: (t1.clientX + t2.clientX) / 2,
+      y: (t1.clientY + t2.clientY) / 2
+    };
   }
 
   /* =========================
@@ -287,11 +180,8 @@ function initMapControls() {
     if (e.touches.length === 1) {
 
       isDragging = true;
-      const touch = e.touches[0];
-
-      lastX = touch.clientX;
-      lastY = touch.clientY;
-      lastTime = Date.now();
+      lastX = e.touches[0].clientX;
+      lastY = e.touches[0].clientY;
 
     }
 
@@ -299,9 +189,18 @@ function initMapControls() {
 
       isDragging = false;
 
-      initialDistance = getDistance(e.touches[0], e.touches[1]);
-      initialScale = scale;
+      startDistance = distance(e.touches[0], e.touches[1]);
+      startScale = scale;
 
+      pinchCenter = center(e.touches[0], e.touches[1]);
+
+      const rect = wrapper.getBoundingClientRect();
+
+      const offsetX = pinchCenter.x - rect.left;
+      const offsetY = pinchCenter.y - rect.top;
+
+      pinchMapX = (offsetX - posX) / scale;
+      pinchMapY = (offsetY - posY) / scale;
     }
 
   }, { passive: false });
@@ -314,50 +213,46 @@ function initMapControls() {
 
     e.preventDefault();
 
+    // Drag
     if (e.touches.length === 1 && isDragging) {
 
       const touch = e.touches[0];
 
-      const now = Date.now();
       const dx = touch.clientX - lastX;
       const dy = touch.clientY - lastY;
 
       posX += dx;
       posY += dy;
 
-      velocityX = dx / (now - lastTime) * 16;
-      velocityY = dy / (now - lastTime) * 16;
-
       lastX = touch.clientX;
       lastY = touch.clientY;
-      lastTime = now;
 
-      clampPosition();
+      clamp();
       update();
     }
 
+    // Pinch zoom
     if (e.touches.length === 2) {
 
-      const newDistance = getDistance(e.touches[0], e.touches[1]);
-      if (!initialDistance) return;
+      const newDistance = distance(e.touches[0], e.touches[1]);
 
-      const zoomFactor = newDistance / initialDistance;
-      const newScale = Math.min(Math.max(initialScale * zoomFactor, 0.5), 3);
+      if (!startDistance) return;
 
-      const center = getCenter(e.touches[0], e.touches[1]);
-
-      const rect = wrapper.getBoundingClientRect();
-      const offsetX = center.x - rect.left;
-      const offsetY = center.y - rect.top;
-
-      const scaleRatio = newScale / scale;
-
-      posX = offsetX - scaleRatio * (offsetX - posX);
-      posY = offsetY - scaleRatio * (offsetY - posY);
+      const newScale = Math.min(
+        Math.max(startScale * (newDistance / startDistance), 0.5),
+        3
+      );
 
       scale = newScale;
 
-      clampPosition();
+      const rect = wrapper.getBoundingClientRect();
+      const offsetX = pinchCenter.x - rect.left;
+      const offsetY = pinchCenter.y - rect.top;
+
+      posX = offsetX - pinchMapX * scale;
+      posY = offsetY - pinchMapY * scale;
+
+      clamp();
       update();
     }
 
@@ -368,65 +263,12 @@ function initMapControls() {
   ========================= */
 
   wrapper.addEventListener("touchend", () => {
-
     isDragging = false;
-    initialDistance = null;
-
-    animateInertia();
+    startDistance = null;
   });
 
-  /* =========================
-     MOUSE (для ПК)
-  ========================= */
-
-  wrapper.addEventListener("mousedown", e => {
-    isDragging = true;
-    lastX = e.clientX;
-    lastY = e.clientY;
-    lastTime = Date.now();
-  });
-
-  wrapper.addEventListener("mousemove", e => {
-
-    if (!isDragging) return;
-
-    const now = Date.now();
-    const dx = e.clientX - lastX;
-    const dy = e.clientY - lastY;
-
-    posX += dx;
-    posY += dy;
-
-    velocityX = dx / (now - lastTime) * 16;
-    velocityY = dy / (now - lastTime) * 16;
-
-    lastX = e.clientX;
-    lastY = e.clientY;
-    lastTime = now;
-
-    clampPosition();
-    update();
-  });
-
-  wrapper.addEventListener("mouseup", () => {
-    isDragging = false;
-    animateInertia();
-  });
-
-  wrapper.addEventListener("mouseleave", () => {
-    isDragging = false;
-  });
-
-  /* =========================
-     Zoom кнопками
-  ========================= */
-
-  window.__mapZoom = value => {
-    scale = Math.min(Math.max(value, 0.5), 3);
-    clampPosition();
-    update();
-  };
 }
+
 
 
 
@@ -447,6 +289,7 @@ function initZoom() {
     window.__mapZoom(zoomLevel);
   };
 }
+
 
 
 
