@@ -1,37 +1,57 @@
-/* ======================
-   🎨 Базовые цвета (фиксированные)
-====================== */
+/* =========================
+   🎨 Цветовая система
+========================= */
 
 :root {
   --bg: #ffffff;
-  --text: #000000;
+  --text: #111111;
   --accent: #2AABEE;
   --card: #ffffff;
-  --border: #e5e5e5;
+  --border: #e6e6e6;
+  --danger: #e74c3c;
+  --success: #2ecc71;
+}
+
+/* =========================
+   🧱 Базовые стили
+========================= */
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  background: #ffffff !important;
-  color: #000000 !important;
+  background: var(--bg);
+  color: var(--text);
   overflow: hidden;
-
-  /* Полностью отключаем любые возможные фильтры */
-  filter: none !important;
 }
 
-/* ======================
+/* =========================
    🧭 Верхняя панель
-====================== */
+========================= */
 
 #topbar {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
   padding: 10px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  gap: 8px;
+}
+
+#team-info {
+  font-size: 13px;
+  line-height: 1.4;
+  opacity: 0.8;
+}
+
+#filters {
+  display: flex;
+  gap: 8px;
   overflow-x: auto;
-  background: #ffffff;
-  border-bottom: 1px solid #e5e5e5;
 }
 
 .filter-btn {
@@ -43,102 +63,79 @@ body {
   font-size: 14px;
   white-space: nowrap;
   transition: 0.2s;
-  color: #000000;
 }
 
 .filter-btn.active {
-  background: #2AABEE;
-  color: #ffffff;
+  background: var(--accent);
+  color: white;
 }
 
-/* ======================
+/* =========================
    🗺 Карта
-====================== */
+========================= */
 
 #map-wrapper {
   position: relative;
   width: 100%;
-  height: calc(100vh - 52px);
+  height: calc(100vh - 110px);
   overflow: hidden;
-  background: #dddddd;
+  background: #dcdcdc;
   touch-action: none;
 }
 
-/* Контейнер карты */
 #map-container {
   position: absolute;
   top: 0;
   left: 0;
   transform-origin: 0 0;
   will-change: transform;
-
-  /* Запрещаем любые фильтры */
-  filter: none !important;
 }
 
-/* САМА КАРТА — всегда цветная */
 #map {
   display: block;
   user-select: none;
   pointer-events: none;
-
-  filter: none !important;
-  -webkit-filter: none !important;
 }
 
-/* Если SVG */
-#map svg {
-  filter: none !important;
-  fill: initial !important;
-}
-
-/* Слой точек */
 #points-layer {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-
-  filter: none !important;
 }
 
-/* ======================
+/* =========================
    📍 Точки
-====================== */
+========================= */
 
 .point {
   position: absolute;
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   transform: translate(-50%, -50%);
   cursor: pointer;
-  transition: transform 0.2s ease;
-
-  /* Всегда цветные */
-  filter: none !important;
+  transition: transform 0.2s ease, opacity 0.2s ease;
 }
 
 .point:hover {
-  transform: translate(-50%, -50%) scale(1.1);
+  transform: translate(-50%, -50%) scale(1.15);
 }
 
-/* Пройденные — БЕЗ grayscale */
+/* ✅ Пройденные */
 .point.completed {
-  opacity: 0.7;
-  filter: none !important;
+  opacity: 0.5;
 }
 
-/* Закрытые — просто прозрачность */
+/* 🔒 Закрытые */
 .point.locked {
-  opacity: 0.4;
+  opacity: 0.35;
   pointer-events: none;
-  filter: none !important;
 }
 
-/* ======================
+/* =========================
    🔍 Zoom кнопки
-====================== */
+========================= */
 
 #zoom-controls {
   position: fixed;
@@ -150,39 +147,39 @@ body {
 }
 
 .zoom-btn {
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
   border: none;
-  background: #2AABEE;
+  background: var(--accent);
   color: white;
   font-size: 22px;
   cursor: pointer;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   transition: 0.2s;
 }
 
 .zoom-btn:active {
-  transform: scale(0.95);
+  transform: scale(0.92);
 }
 
-/* ======================
+/* =========================
    📄 Модальное окно
-====================== */
+========================= */
 
 #modal {
   position: fixed;
   bottom: 0;
   left: 0;
   width: 100%;
-  background: #ffffff;
-  border-radius: 20px 20px 0 0;
+  background: var(--card);
+  border-radius: 22px 22px 0 0;
   padding: 20px;
-  box-shadow: 0 -6px 25px rgba(0,0,0,0.2);
+  box-shadow: 0 -6px 30px rgba(0,0,0,0.25);
   display: none;
   animation: slideUp 0.25s ease;
-
-  filter: none !important;
+  max-height: 75vh;
+  overflow-y: auto;
 }
 
 @keyframes slideUp {
@@ -192,15 +189,30 @@ body {
 
 #modal h2 {
   margin-top: 0;
-  color: #000000;
+  margin-bottom: 8px;
 }
+
+#modal p {
+  font-size: 14px;
+  opacity: 0.85;
+}
+
+#modal-meta {
+  font-size: 12px;
+  margin-top: 8px;
+  opacity: 0.6;
+}
+
+/* =========================
+   🔘 Кнопки
+========================= */
 
 .modal-btn {
   margin-top: 12px;
   padding: 12px;
   border: none;
-  border-radius: 12px;
-  background: #2AABEE;
+  border-radius: 14px;
+  background: var(--accent);
   color: white;
   width: 100%;
   font-size: 15px;
@@ -208,17 +220,32 @@ body {
   transition: 0.2s;
 }
 
-.modal-btn:active {
-  transform: scale(0.98);
+.modal-btn.gray {
+  background: #888;
 }
 
-/* ======================
-   📱 Mobile
-====================== */
+.modal-btn:active {
+  transform: scale(0.97);
+}
+
+/* =========================
+   📱 Mobile tweaks
+========================= */
 
 @media (max-width: 480px) {
+
   .point {
-    width: 30px;
-    height: 30px;
+    width: 32px;
+    height: 32px;
+  }
+
+  #zoom-controls {
+    bottom: 15px;
+    right: 15px;
+  }
+
+  .zoom-btn {
+    width: 42px;
+    height: 42px;
   }
 }
