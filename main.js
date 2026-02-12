@@ -1,17 +1,8 @@
 /* =========================
-   🚀 Telegram Init
-========================= */
-
-const tg = window.Telegram?.WebApp;
-if (tg) {
-  tg.ready();
-  tg.expand();
-}
-
-/* =========================
    ⚙ CONFIG
 ========================= */
 
+// ⚠ ВАЖНО: обязательно https
 const API = "https://mayakmaps-production.up.railway.app/api";
 
 let TEAM_NUMBER = null;
@@ -23,37 +14,61 @@ let currentFilter = "all";
 let activePoint = null;
 
 /* =========================
-   👤 Получение данных пользователя
+   🚀 INIT
+========================= */
+
+(async () => {
+  await loadUser();
+  await loadPoints();
+  initFilters();
+  initMapControls();
+})();
+
+/* =========================
+   👤 Получение пользователя
 ========================= */
 
 async function loadUser() {
 
-  if (!tg || !tg.initDataUnsafe?.user) {
-    console.warn("Dev mode — fallback user");
-    TEAM_NUMBER = localStorage.getItem("team_id") || "1";
-    ROLE = localStorage.getItem("role") || "member";
-    return;
+  try {
+
+    const telegram_id = TelegramApp?.getTelegramId();
+
+    // DEV fallback
+    if (!telegram_id) {
+      console.warn("DEV MODE — используем localStorage");
+
+      TEAM_NUMBER = localStorage.getItem("team_id") || "1";
+      ROLE = localStorage.getItem("role") || "member";
+
+      updateTeamInfo();
+      return;
+    }
+
+    const response = await fetch(API + "/me", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ telegram_id })
+    });
+
+    if (!response.ok) {
+      console.error("Ошибка получения пользователя");
+      return;
+    }
+
+    const data = await response.json();
+
+    TEAM_NUMBER = data.team_number;
+    ROLE = data.role;
+
+    localStorage.setItem("team_id", TEAM_NUMBER);
+    localStorage.setItem("role", ROLE);
+
+    updateTeamInfo();
+
+  } catch (err) {
+    console.error("loadUser error:", err);
   }
-
-  const telegram_id = tg.initDataUnsafe.user.id;
-
-  const response = await fetch(API + "/me", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ telegram_id })
-  });
-
-  const data = await response.json();
-
-  TEAM_NUMBER = data.team_number;
-  ROLE = data.role;
-
-  localStorage.setItem("team_id", TEAM_NUMBER);
-  localStorage.setItem("role", ROLE);
-
-  updateTeamInfo();
 }
 
 /* =========================
@@ -70,77 +85,89 @@ async function loadPoints() {
       API + "/points?team_number=" + TEAM_NUMBER
     );
 
+    if (!response.ok) {
+      console.error("Ошибка загрузки точек");
+      return;
+    }
+
     const data = await response.json();
 
-    pointsData = data.points;
+    pointsData = data.points || [];
     completedPoints = data.completed || [];
 
     renderPoints();
 
   } catch (err) {
-    console.error("Ошибка загрузки точек:", err);
+    console.error("loadPoints error:", err);
   }
 }
 
 /* =========================
-   🧭 Filters
+   🎛 Фильтры
 ========================= */
 
-document.querySelectorAll(".filter-btn").forEach(btn => {
-  btn.addEventListener("click", () => {
+function initFilters() {
 
-    document.querySelectorAll(".filter-btn")
-      .forEach(b => b.classList.remove("active"));
+  document.querySelectorAll(".filter-btn").forEach(btn => {
 
-    btn.classList.add("active");
-    currentFilter = btn.dataset.type;
+    btn.addEventListener("click", () => {
 
-    renderPoints();
+      document.querySelectorAll(".filter-btn")
+        .forEach(b => b.classList.remove("active"));
+
+      btn.classList.add("active");
+      currentFilter = btn.dataset.type;
+
+      renderPoints();
+    });
+
   });
-});
+}
 
 /* =========================
-   📍 Render Points
+   📍 Отрисовка точек
 ========================= */
 
 const layer = document.getElementById("points-layer");
 
 function renderPoints() {
 
+  if (!layer) return;
+
   layer.innerHTML = "";
 
   pointsData.forEach(point => {
 
-    /* Фильтр по типу */
+    // Фильтр по типу
     if (currentFilter !== "all" && point.type !== currentFilter)
       return;
 
-    /* Видимость для команд */
+    // Проверка visible_for
     if (
       point.visible_for &&
       point.visible_for.length > 0 &&
       !point.visible_for.includes(String(TEAM_NUMBER))
     ) return;
 
-    /* Проверка времени открытия */
+    // Проверка unlock времени
     const now = new Date();
     const unlockTime = point.unlock ? new Date(point.unlock) : null;
-
     const lockedByTime = unlockTime && now < unlockTime;
     const locked = point.locked || lockedByTime;
 
-    const el = document.createElement("img");
-    el.src = "assets/icons/" + point.type + ".png";
+    const el = document.createElement("div");
     el.className = "point";
+
+    // если нет иконок — fallback круг
+    el.style.background = "#2AABEE";
+    el.style.borderRadius = "50%";
 
     el.style.left = point.x + "%";
     el.style.top = point.y + "%";
 
-    /* Пройденные */
     if (completedPoints.includes(point.id))
       el.classList.add("completed");
 
-    /* Закрытые */
     if (locked)
       el.classList.add("locked");
 
@@ -159,7 +186,7 @@ function renderPoints() {
 }
 
 /* =========================
-   📄 Modal
+   📄 Модалка
 ========================= */
 
 const modal = document.getElementById("modal");
@@ -193,110 +220,31 @@ function openModal(point) {
 }
 
 /* =========================
-   ✅ Complete Point
+   ✅ Засчёт точки
 ========================= */
 
 completeBtn.addEventListener("click", () => {
 
   if (!activePoint) return;
 
-  if (!tg) return;
-
-  tg.sendData(JSON.stringify({
+  TelegramApp.sendData({
     type: "point_completed",
     pointId: activePoint.id
-  }));
+  });
 
   modal.style.display = "none";
 
-  /* Перезагружаем точки через 1 сек */
+  // Обновляем данные через секунду
   setTimeout(loadPoints, 1000);
 });
 
 /* =========================
-   🔍 Zoom + Drag
-========================= */
-
-let scale = 1;
-let posX = 0;
-let posY = 0;
-let isDragging = false;
-let startX, startY;
-
-const container = document.getElementById("map-container");
-const wrapper = document.getElementById("map-wrapper");
-
-function updateTransform() {
-  container.style.transform =
-    `translate(${posX}px, ${posY}px) scale(${scale})`;
-}
-
-function zoom(factor) {
-  scale *= factor;
-  scale = Math.min(Math.max(scale, 0.5), 3);
-  updateTransform();
-}
-
-/* Zoom кнопки */
-document.querySelectorAll(".zoom-btn").forEach(btn => {
-  btn.addEventListener("click", () => {
-    zoom(btn.innerText === "+" ? 1.2 : 0.8);
-  });
-});
-
-/* Колёсико */
-wrapper.addEventListener("wheel", (e) => {
-  e.preventDefault();
-  zoom(e.deltaY < 0 ? 1.1 : 0.9);
-});
-
-/* Drag мышью */
-wrapper.addEventListener("mousedown", (e) => {
-  isDragging = true;
-  startX = e.clientX - posX;
-  startY = e.clientY - posY;
-});
-
-window.addEventListener("mouseup", () => {
-  isDragging = false;
-});
-
-window.addEventListener("mousemove", (e) => {
-  if (!isDragging) return;
-
-  posX = e.clientX - startX;
-  posY = e.clientY - startY;
-  updateTransform();
-});
-
-/* Touch */
-wrapper.addEventListener("touchstart", (e) => {
-  if (e.touches.length === 1) {
-    isDragging = true;
-    startX = e.touches[0].clientX - posX;
-    startY = e.touches[0].clientY - posY;
-  }
-});
-
-wrapper.addEventListener("touchmove", (e) => {
-  if (!isDragging) return;
-
-  posX = e.touches[0].clientX - startX;
-  posY = e.touches[0].clientY - startY;
-  updateTransform();
-});
-
-wrapper.addEventListener("touchend", () => {
-  isDragging = false;
-});
-
-/* =========================
-   👥 Обновление верхней панели
+   👥 Обновление панели
 ========================= */
 
 function updateTeamInfo() {
-  const teamInfo = document.getElementById("team-info");
 
+  const teamInfo = document.getElementById("team-info");
   if (!teamInfo) return;
 
   teamInfo.innerHTML = `
@@ -306,14 +254,56 @@ function updateTeamInfo() {
 }
 
 /* =========================
-   🚀 INIT
+   🗺 Zoom + Drag
 ========================= */
 
-(async () => {
-  await loadUser();
-  await loadPoints();
-  updateTransform();
-})();
+function initMapControls() {
 
+  let scale = 1;
+  let posX = 0;
+  let posY = 0;
+  let isDragging = false;
+  let startX, startY;
 
+  const container = document.getElementById("map-container");
+  const wrapper = document.getElementById("map-wrapper");
 
+  function updateTransform() {
+    container.style.transform =
+      `translate(${posX}px, ${posY}px) scale(${scale})`;
+  }
+
+  function zoom(factor) {
+    scale *= factor;
+    scale = Math.min(Math.max(scale, 0.5), 3);
+    updateTransform();
+  }
+
+  document.querySelectorAll(".zoom-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      zoom(btn.innerText === "+" ? 1.2 : 0.8);
+    });
+  });
+
+  wrapper.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    zoom(e.deltaY < 0 ? 1.1 : 0.9);
+  });
+
+  wrapper.addEventListener("mousedown", (e) => {
+    isDragging = true;
+    startX = e.clientX - posX;
+    startY = e.clientY - posY;
+  });
+
+  window.addEventListener("mouseup", () => {
+    isDragging = false;
+  });
+
+  window.addEventListener("mousemove", (e) => {
+    if (!isDragging) return;
+    posX = e.clientX - startX;
+    posY = e.clientY - startY;
+    updateTransform();
+  });
+}
