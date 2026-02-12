@@ -8,42 +8,14 @@
 <title>Интерактивная карта</title>
 
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link rel="stylesheet" href="styles.css" />
-
-<style>
-#team-info {
-  color: #000;
-  font-size: 14px;
-}
-
-.point {
-  position: absolute;
-  width: 18px;
-  height: 18px;
-  background: #2AABEE;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  cursor: pointer;
-}
-
-#debug {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  max-height: 35%;
-  overflow: auto;
-  background: black;
-  color: lime;
-  font-size: 11px;
-  z-index: 9999;
-  padding: 6px;
-}
-</style>
+<link rel="stylesheet" href="styles.css?v=2" />
 </head>
 
 <body>
 
+<!-- =========================
+     🧭 Верхняя панель
+========================= -->
 <div id="topbar">
   <div id="team-info"></div>
 
@@ -56,6 +28,9 @@
   </div>
 </div>
 
+<!-- =========================
+     🗺 Карта
+========================= -->
 <div id="map-wrapper">
   <div id="map-container">
     <img src="assets/map.svg" id="map" alt="Карта">
@@ -63,28 +38,48 @@
   </div>
 </div>
 
+<!-- =========================
+     🔍 Zoom кнопки
+========================= -->
 <div id="zoom-controls">
-  <button class="zoom-btn">+</button>
-  <button class="zoom-btn">−</button>
+  <button class="zoom-btn" id="zoom-in">+</button>
+  <button class="zoom-btn" id="zoom-out">−</button>
 </div>
 
-<div id="modal" style="display:none;">
+<!-- =========================
+     📄 Модальное окно
+========================= -->
+<div id="modal">
   <h2 id="modal-title"></h2>
   <p id="modal-desc"></p>
   <div id="modal-meta"></div>
 
-  <button id="complete-btn">Отметить как пройдено</button>
-  <button id="close-btn">Закрыть</button>
+  <button id="complete-btn" class="modal-btn">
+    Отметить как пройдено
+  </button>
+
+  <button id="close-btn" class="modal-btn gray">
+    Закрыть
+  </button>
 </div>
 
-<script src="main.js"></script>
-
+<!-- =========================
+     🐞 Debug (только для разработки)
+========================= -->
 <div id="debug"></div>
+
+<!-- =========================
+     📦 Скрипты
+========================= -->
+<script src="telegram.js?v=2"></script>
+<script src="main.js?v=2"></script>
 
 <script>
 window.onerror = function(msg, url, line) {
   const debug = document.getElementById("debug");
-  debug.innerHTML += `<div>❌ ${msg} (line ${line})</div>`;
+  if (debug) {
+    debug.innerHTML += `<div>❌ ${msg} (line ${line})</div>`;
+  }
 };
 </script>
 
