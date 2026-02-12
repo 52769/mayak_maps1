@@ -7,18 +7,48 @@
 
 <title>Интерактивная карта</title>
 
-<!-- Telegram WebApp API -->
+<!-- Telegram WebApp -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-<!-- Стили -->
 <link rel="stylesheet" href="styles.css" />
+
+<style>
+/* Минимальные гарантированные стили */
+
+#team-info {
+  color: #000;
+  font-size: 14px;
+}
+
+.point {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: #2AABEE;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+}
+
+#debug {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  max-height: 40%;
+  overflow: auto;
+  background: black;
+  color: lime;
+  font-size: 11px;
+  z-index: 9999;
+  padding: 6px;
+}
+</style>
 </head>
 
 <body>
 
-<!-- =========================
-     🧭 ВЕРХНЯЯ ПАНЕЛЬ
-========================= -->
+<!-- Верхняя панель -->
 <div id="topbar">
   <div id="team-info"></div>
 
@@ -31,33 +61,25 @@
   </div>
 </div>
 
-<!-- =========================
-     🗺 КАРТА
-========================= -->
+<!-- Карта -->
 <div id="map-wrapper">
   <div id="map-container">
 
-    <!-- Фон карты -->
-    <img src="assets/map.svg" id="map" alt="Карта территории">
+    <img src="assets/map.svg" id="map" alt="Карта">
 
-    <!-- Слой точек -->
     <div id="points-layer"></div>
 
   </div>
 </div>
 
-<!-- =========================
-     🔍 ZOOM
-========================= -->
+<!-- Zoom -->
 <div id="zoom-controls">
   <button class="zoom-btn">+</button>
   <button class="zoom-btn">−</button>
 </div>
 
-<!-- =========================
-     📄 МОДАЛКА
-========================= -->
-<div id="modal">
+<!-- Модалка -->
+<div id="modal" style="display:none;">
   <h2 id="modal-title"></h2>
   <p id="modal-desc"></p>
   <div id="modal-meta"></div>
@@ -71,15 +93,26 @@
   </button>
 </div>
 
-<!-- =========================
-     🚀 SCRIPTS
-========================= -->
-
-<!-- Telegram слой -->
-<script src="telegram.js"></script>
+<!-- Telegram init -->
+<script>
+if (window.Telegram && window.Telegram.WebApp) {
+  window.Telegram.WebApp.ready();
+  window.Telegram.WebApp.expand();
+}
+</script>
 
 <!-- Основная логика -->
 <script src="main.js"></script>
+
+<!-- Встроенная отладка -->
+<div id="debug"></div>
+
+<script>
+window.onerror = function(msg, url, line, col, error) {
+  const debug = document.getElementById("debug");
+  debug.innerHTML += `<div>❌ ${msg} (line ${line})</div>`;
+};
+</script>
 
 </body>
 </html>
